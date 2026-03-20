@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>経理アプリ</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+  font-family: -apple-system;
+  background: #f2f2f7;
+  margin: 0;
+}
+
+.card {
+  background: white;
+  margin: 12px;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+input, select, button {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+}
+
+button {
+  background: linear-gradient(135deg, #007AFF, #5AC8FA);
+  color: white;
+  border: none;
+}
+
+.delete-btn { background: red; }
+.row { display:flex; justify-content:space-between; }
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h2>ログイン</h2>
+<button id="loginBtn">Googleログイン</button>
+<div id="user"></div>
+</div>
+
+<div class="card">
+<h2>入力</h2>
+<input type="date" id="date">
+
+<select id="type">
+<option value="income">売上</option>
+<option value="expense">経費</option>
+</select>
+
+<select id="category">
+<option>通信費</option>
+<option>サブスク</option>
+<option>消耗品費</option>
+<option>地代家賃</option>
+<option>支払手数料</option>
+<option>雑費</option>
+</select>
+
+<input type="number" id="amount">
+<button id="addBtn">追加</button>
+
+<button onclick="downloadCSV()">CSVダウンロード</button>
+</div>
+
+<div class="card">
+<h3>集計</h3>
+<div id="summary"></div>
+</div>
+
+<div class="card">
+<canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+<div id="list"></div>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, where
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "ここ",
+  authDomain: "ここ",
+  projectId: "ここ",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let data = [];
+
+document.getElementById("loginBtn").onclick = () => {
+  signInWithPopup(auth, provider);
+};
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    document.getElementById("user").innerText = user.email;
+    loadData(user.uid);
+  }
+});
+
+document.getElementById("addBtn").onclick = async () => {
+  const user = auth.currentUser;
+  if (!user) return alert("ログインしてください");
+
+  const date = document.getElementById("date").value;
+  const type = document.getElementById("type").value;
+  const category = document.getElementById("category").value;
+  const amount = Number(document.getElementById("amount").value);
+
+  await addDoc(collection(db, "keiri"), {
+    uid: user.uid, date, type, category, amount
+  });
+
+  loadData(user.uid);
+};
+
+window.deleteItem = async (id) => {
+  await deleteDoc(doc(db, "keiri", id));
+  loadData(auth.currentUser.uid);
+};
+
+async function loadData(uid) {
+  const q = query(collection(db, "keiri"), where("uid", "==", uid));
+  const snapshot = await getDocs(q);
+
+  data = [];
+  snapshot.forEach(d => data.push({ id: d.id, ...d.data() }));
+
+  render();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  let income = 0;
+  let expense = 0;
+  let categoryTotals = {};
+  const month = new Date().toISOString().slice(0,7);
+
+  data.forEach(d => {
+    const div = document.createElement("div");
+
+    div.innerHTML = `
+      ${d.date} ${d.category} ¥${d.amount}
+      <button onclick="deleteItem('${d.id}')">削除</button>
+    `;
+
+    list.appendChild(div);
+
+    if (d.date.startsWith(month)) {
+      if (d.type === "income") income += d.amount;
+      else {
+        expense += d.amount;
+        categoryTotals[d.category] =
+          (categoryTotals[d.category] || 0) + d.amount;
+      }
+    }
+  });
+
+  document.getElementById("summary").innerHTML =
+    `売上:${income} 経費:${expense} 利益:${income-expense}`;
+
+  if (window.chart) window.chart.destroy();
+
+  window.chart = new Chart(document.getElementById("chart"), {
+    type: "doughnut",
+    data: {
+      labels: Object.keys(categoryTotals),
+      datasets: [{ data: Object.values(categoryTotals) }]
+    }
+  });
+}
+
+// CSV出力
+window.downloadCSV = function() {
+  let csv = "日付,区分,科目,金額\n";
+
+  data.forEach(d => {
+    csv += `${d.date},${d.type},${d.category},${d.amount}\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "keiri.csv";
+  link.click();
+};
+
+</script>
+
+</body>
+</html>
