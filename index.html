@@ -119,7 +119,7 @@ window.login = function(){
     mainArea.classList.remove("hidden");
     loadData();
   })
-  .catch(()=>alert("ログイン失敗"));
+  .catch((e)=>alert(e.message));
 };
 
 // ===== 初期化 =====
