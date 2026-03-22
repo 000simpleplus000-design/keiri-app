@@ -189,14 +189,19 @@ function render(){
   let html="<tr><th>日付</th><th>区分</th><th>金額</th><th></th></tr>";
 
   sales.forEach((s,i)=>{
-    html+=`<tr><td>${s.date}</td><td>${s.category}</td><td>${s.amount}</td>
-    <td><button onclick="del('s',${i})">削除</button></td></tr>`;
-  });
-
+    html+=`<tr>
+<td>${s.date}</td>
+<td>${s.category}</td>
+<td>${s.amount.toLocaleString()}円</td>
+<td><button onclick="del('s',${i})">削除</button></td>
+</tr>`;
   expense.forEach((e,i)=>{
-    html+=`<tr><td>${s.amount.toLocaleString()}円</td><td>${e.account}</td><td>${s.amount.toLocaleString()}円</td>
-    <td><button onclick="del('e',${i})">削除</button></td></tr>`;
-  });
+   html+=`<tr>
+<td>${e.date}</td>
+<td>${e.account}</td>
+<td>${e.amount.toLocaleString()}円</td>
+<td><button onclick="del('e',${i})">削除</button></td>
+</tr>`;
 
   dataTable.innerHTML=html;
 }
