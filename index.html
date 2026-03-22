@@ -93,6 +93,9 @@ td, th { border:1px solid #ccc; padding:5px; font-size:12px; }
 <h3>一覧</h3>
 <table id="dataTable"></table>
 
+<h3>月別集計</h3>
+<div id="monthlySummary"></div>
+
 </div>
 
 <script>
@@ -105,19 +108,19 @@ const users = {
   "u-to": "5678"
 };
 
-let currentUser = "";
+let currentUser="";
+let sales=[];
+let expense=[];
 
 // ===== ログイン =====
 function login(){
-  const idValue = document.getElementById("id").value.trim();
-  const passValue = document.getElementById("pass").value.trim();
+  const idValue=id.value.trim();
+  const passValue=pass.value.trim();
 
-  if(users[idValue] && users[idValue] === passValue){
-    currentUser = idValue;
-
-    document.getElementById("loginArea").classList.add("hidden");
-    document.getElementById("mainArea").classList.remove("hidden");
-
+  if(users[idValue] && users[idValue]===passValue){
+    currentUser=idValue;
+    loginArea.classList.add("hidden");
+    mainArea.classList.remove("hidden");
     initApp();
     loadData();
   }else{
@@ -128,85 +131,79 @@ function login(){
 // ===== 初期化 =====
 function initApp(){
 
-  document.getElementById("date").addEventListener("change",()=>{
-    const d=new Date(document.getElementById("date").value);
-    document.getElementById("month").value=d.getMonth()+1;
-  });
+  date.onchange=()=>{
+    const d=new Date(date.value);
+    month.value=d.getMonth()+1;
+  };
 
-  document.getElementById("mode").addEventListener("change",()=>{
-    document.getElementById("salesArea").classList.toggle("hidden", mode.value!=="売上");
-    document.getElementById("expenseArea").classList.toggle("hidden", mode.value!=="経費");
-  });
+  mode.onchange=()=>{
+    salesArea.classList.toggle("hidden",mode.value!=="売上");
+    expenseArea.classList.toggle("hidden",mode.value!=="経費");
+  };
 
-  document.getElementById("rate").addEventListener("input",()=>{
-    const amount = document.getElementById("amount").value;
-    const rate = document.getElementById("rate").value;
-    document.getElementById("finalAmount").value = Math.floor(amount * rate / 100);
-  });
-
+  rate.oninput=()=>{
+    finalAmount.value=Math.floor(amount.value*rate.value/100);
+  };
 }
 
-// ===== データ =====
-let sales=[];
-let expense=[];
-
+// ===== 保存キー =====
 function getKey(type){
-  return type + "_" + currentUser;
+  return type+"_"+currentUser;
 }
 
+// ===== 保存 =====
 function saveData(){
-  localStorage.setItem(getKey("sales"), JSON.stringify(sales));
-  localStorage.setItem(getKey("expense"), JSON.stringify(expense));
+  localStorage.setItem(getKey("sales"),JSON.stringify(sales));
+  localStorage.setItem(getKey("expense"),JSON.stringify(expense));
 }
 
+// ===== 読込 =====
 function loadData(){
-  sales = JSON.parse(localStorage.getItem(getKey("sales"))) || [];
-  expense = JSON.parse(localStorage.getItem(getKey("expense"))) || [];
+  sales=JSON.parse(localStorage.getItem(getKey("sales")))||[];
+  expense=JSON.parse(localStorage.getItem(getKey("expense")))||[];
   calc();
 }
 
 // ===== 追加 =====
 function addData(){
 
-  if(document.getElementById("mode").value==="売上"){
-
+  if(mode.value==="売上"){
     sales.push({
-      date: document.getElementById("date").value,
-      category: document.getElementById("salesCategory").value,
-      account: document.getElementById("salesAccount").value,
-      amount: Number(document.getElementById("salesAmount").value),
-      note: document.getElementById("salesNote").value
+      date:date.value,
+      month:month.value,
+      category:salesCategory.value,
+      account:salesAccount.value,
+      amount:Number(salesAmount.value),
+      note:salesNote.value
     });
-
   }else{
-
     expense.push({
-      date: document.getElementById("date").value,
-      account: document.getElementById("expenseAccount").value,
-      payment: document.getElementById("payment").value,
-      amount: Number(document.getElementById("finalAmount").value),
-      note: document.getElementById("expenseNote").value
+      date:date.value,
+      month:month.value,
+      account:expenseAccount.value,
+      payment:payment.value,
+      amount:Number(finalAmount.value),
+      note:expenseNote.value
     });
-
   }
 
   saveData();
   calc();
 }
 
-// ===== 集計＋一覧 =====
+// ===== 集計 =====
 function calc(){
 
   let s=sales.reduce((a,b)=>a+b.amount,0);
   let e=expense.reduce((a,b)=>a+b.amount,0);
 
-  document.getElementById("summary").innerHTML =
-    `売上:${s}円 / 経費:${e}円 / 利益:${s-e}円`;
+  summary.innerHTML=`売上:${s}円 / 経費:${e}円 / 利益:${s-e}円`;
 
   render();
+  renderMonthly();
 }
 
-// ===== 一覧表示 =====
+// ===== 一覧 =====
 function render(){
 
   let html="<tr><th>日付</th><th>区分</th><th>金額</th><th></th></tr>";
@@ -229,15 +226,39 @@ function render(){
     </tr>`;
   });
 
-  document.getElementById("dataTable").innerHTML=html;
+  dataTable.innerHTML=html;
 }
 
 // ===== 削除 =====
 function del(type,i){
-  if(type==="s"){ sales.splice(i,1); }
-  else{ expense.splice(i,1); }
+  if(type==="s"){sales.splice(i,1);}
+  else{expense.splice(i,1);}
   saveData();
   calc();
+}
+
+// ===== 月別 =====
+function renderMonthly(){
+
+  let monthly={};
+
+  sales.forEach(s=>{
+    if(!monthly[s.month]) monthly[s.month]={s:0,e:0};
+    monthly[s.month].s+=Number(s.amount);
+  });
+
+  expense.forEach(e=>{
+    if(!monthly[e.month]) monthly[e.month]={s:0,e:0};
+    monthly[e.month].e+=Number(e.amount);
+  });
+
+  let html="";
+
+  Object.keys(monthly).sort((a,b)=>a-b).forEach(m=>{
+    html+=`${m}月：売上 ${monthly[m].s} / 経費 ${monthly[m].e} / 利益 ${monthly[m].s-monthly[m].e}<br>`;
+  });
+
+  monthlySummary.innerHTML=html;
 }
 
 // ===== CSV =====
