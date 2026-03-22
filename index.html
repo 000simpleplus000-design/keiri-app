@@ -194,7 +194,7 @@ function render(){
   });
 
   expense.forEach((e,i)=>{
-    html+=`<tr><td>${e.date}</td><td>${e.account}</td><td>${e.amount}</td>
+    html+=`<tr><td>${s.amount.toLocaleString()}円</td><td>${e.account}</td><td>${s.amount.toLocaleString()}円</td>
     <td><button onclick="del('e',${i})">削除</button></td></tr>`;
   });
 
@@ -225,7 +225,7 @@ function monthly(){
 
   let html="";
   Object.keys(m).forEach(k=>{
-    html+=`${k}月：${m[k].s-m[k].e}<br>`;
+    html+=`${k}月：${(m[k].s-m[k].e).toLocaleString()}円<br>`;
   });
 
   monthlySummary.innerHTML=html;
