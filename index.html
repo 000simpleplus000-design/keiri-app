@@ -27,6 +27,7 @@ td, th { border:1px solid #ccc; padding:5px; font-size:12px; }
 <input type="text" id="id" placeholder="メール">
 <input type="password" id="pass" placeholder="パスワード">
 <button onclick="login()">ログイン</button>
+<button onclick="signup()">新規登録</button>
 </div>
 
 <!-- メイン -->
@@ -87,7 +88,7 @@ td, th { border:1px solid #ccc; padding:5px; font-size:12px; }
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -225,6 +226,21 @@ function monthly(){
 
   monthlySummary.innerHTML=html;
 }
+
+// ===== 新規登録 =====
+window.signup = function(){
+
+  const email = document.getElementById("id").value;
+  const passVal = document.getElementById("pass").value;
+
+  createUserWithEmailAndPassword(auth, email, passVal)
+  .then(()=>{
+    alert("登録完了！ログインしてください");
+  })
+  .catch((e)=>{
+    alert("登録失敗：" + e.message);
+  });
+};
 
 // ===== CSV =====
 window.downloadCSV=function(){
