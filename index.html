@@ -174,11 +174,11 @@ function calc(){
   let s=sales.reduce((a,b)=>a+b.amount,0);
   let e=expense.reduce((a,b)=>a+b.amount,0);
 
-  summary.innerHTML=`
-　売上合計：${s}円<br>
-　経費合計：${e}円<br>
-　利益：${s-e}円
-　`;
+summary.innerHTML=`
+売上合計：${s}円<br>
+経費合計：${e}円<br>
+利益：${s-e}円
+`;
   
   render();
   monthly();
