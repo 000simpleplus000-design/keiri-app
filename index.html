@@ -15,6 +15,8 @@
 body { font-family: sans-serif; padding: 10px; }
 input, select, button { width:100%; margin:5px 0; padding:10px; }
 .hidden { display:none; }
+table { width:100%; border-collapse: collapse; margin-top:10px; }
+td, th { border:1px solid #ccc; padding:5px; font-size:12px; }
 </style>
 </head>
 
@@ -41,19 +43,55 @@ input, select, button { width:100%; margin:5px 0; padding:10px; }
 
 <!-- 売上 -->
 <div id="salesArea">
+
+<select id="salesCategory">
+<option>LINE</option>
+<option>BOOTH</option>
+<option>Kindle</option>
+<option>その他</option>
+</select>
+
+<select id="salesAccount">
+<option>売上</option>
+<option>雑収入</option>
+</select>
+
 <input type="number" id="salesAmount" placeholder="売上金額">
+<input type="text" id="salesNote" placeholder="備考">
+
 </div>
 
 <!-- 経費 -->
 <div id="expenseArea" class="hidden">
+
+<select id="expenseAccount">
+<option>通信費</option>
+<option>サブスク</option>
+<option>仕入</option>
+<option>交通費</option>
+<option>雑費</option>
+</select>
+
+<select id="payment">
+<option>現金</option>
+<option>クレカ</option>
+<option>電子マネー</option>
+</select>
+
 <input type="number" id="amount" placeholder="支払金額">
 <input type="number" id="rate" placeholder="按分率">
 <input type="number" id="finalAmount" readonly placeholder="経費計上額">
+<input type="text" id="expenseNote" placeholder="備考">
+
 </div>
 
 <button onclick="addData()">追加</button>
+<button onclick="downloadCSV()">CSV出力</button>
 
 <div id="summary"></div>
+
+<h3>一覧</h3>
+<table id="dataTable"></table>
 
 </div>
 
@@ -129,22 +167,97 @@ function loadData(){
 
 // ===== 追加 =====
 function addData(){
+
   if(document.getElementById("mode").value==="売上"){
-    sales.push({ amount:Number(document.getElementById("salesAmount").value) });
+
+    sales.push({
+      date: document.getElementById("date").value,
+      category: document.getElementById("salesCategory").value,
+      account: document.getElementById("salesAccount").value,
+      amount: Number(document.getElementById("salesAmount").value),
+      note: document.getElementById("salesNote").value
+    });
+
   }else{
-    expense.push({ amount:Number(document.getElementById("finalAmount").value) });
+
+    expense.push({
+      date: document.getElementById("date").value,
+      account: document.getElementById("expenseAccount").value,
+      payment: document.getElementById("payment").value,
+      amount: Number(document.getElementById("finalAmount").value),
+      note: document.getElementById("expenseNote").value
+    });
+
   }
 
   saveData();
   calc();
 }
 
-// ===== 集計 =====
+// ===== 集計＋一覧 =====
 function calc(){
+
   let s=sales.reduce((a,b)=>a+b.amount,0);
   let e=expense.reduce((a,b)=>a+b.amount,0);
+
   document.getElementById("summary").innerHTML =
     `売上:${s}円 / 経費:${e}円 / 利益:${s-e}円`;
+
+  render();
+}
+
+// ===== 一覧表示 =====
+function render(){
+
+  let html="<tr><th>日付</th><th>区分</th><th>金額</th><th></th></tr>";
+
+  sales.forEach((s,i)=>{
+    html+=`<tr>
+    <td>${s.date}</td>
+    <td>${s.category}</td>
+    <td>${s.amount}</td>
+    <td><button onclick="del('s',${i})">削除</button></td>
+    </tr>`;
+  });
+
+  expense.forEach((e,i)=>{
+    html+=`<tr>
+    <td>${e.date}</td>
+    <td>${e.account}</td>
+    <td>${e.amount}</td>
+    <td><button onclick="del('e',${i})">削除</button></td>
+    </tr>`;
+  });
+
+  document.getElementById("dataTable").innerHTML=html;
+}
+
+// ===== 削除 =====
+function del(type,i){
+  if(type==="s"){ sales.splice(i,1); }
+  else{ expense.splice(i,1); }
+  saveData();
+  calc();
+}
+
+// ===== CSV =====
+function downloadCSV(){
+
+  let csv="日付,区分,金額\n";
+
+  sales.forEach(s=>{
+    csv+=`${s.date},${s.category},${s.amount}\n`;
+  });
+
+  expense.forEach(e=>{
+    csv+=`${e.date},${e.account},${e.amount}\n`;
+  });
+
+  const blob=new Blob([csv],{type:"text/csv"});
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download="keiri.csv";
+  link.click();
 }
 
 </script>
