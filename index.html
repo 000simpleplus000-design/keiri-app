@@ -175,9 +175,9 @@ function calc(){
   let e=expense.reduce((a,b)=>a+b.amount,0);
 
 summary.innerHTML=`
-売上合計：${s}円<br>
-経費合計：${e}円<br>
-利益：${s-e}円
+売上合計：${(s||0).toLocaleString()}円<br>
+経費合計：${(e||0).toLocaleString()}円<br>
+利益：${((s-e)||0).toLocaleString()}円
 `;
   
   render();
