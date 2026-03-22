@@ -157,7 +157,6 @@ async function loadData(){
 
 // ===== 追加 =====
 window.addData=function(){
-window.addData=function(){
 
   if(mode.value==="売上"){
     sales.push({
@@ -208,20 +207,26 @@ function render(){
     html+=`<tr>
 <td>${s.date}</td>
 <td>${s.category}</td>
+<td>${s.account}</td>
 <td>${s.amount.toLocaleString()}円</td>
+<td>${s.note||""}</td>
 <td><button onclick="del('s',${i})">削除</button></td>
 </tr>`;
+  });
+
   expense.forEach((e,i)=>{
-   html+=`<tr>
+    html+=`<tr>
 <td>${e.date}</td>
+<td>${e.payment}</td>
 <td>${e.account}</td>
 <td>${e.amount.toLocaleString()}円</td>
+<td>${e.note||""}</td>
 <td><button onclick="del('e',${i})">削除</button></td>
 </tr>`;
+  });
 
   dataTable.innerHTML=html;
 }
-
 // ===== 削除 =====
 window.del=function(t,i){
   if(t==="s"){sales.splice(i,1);}else{expense.splice(i,1);}
@@ -234,26 +239,16 @@ function monthly(){
 
   let m={};
 
-  sales.forEach((s,i)=>{
-  html+=`<tr>
-  <td>${s.date}</td>
-  <td>${s.category}</td>
-  <td>${s.account}</td>
-  <td>${s.amount.toLocaleString()}円</td>
-  <td>${s.note||""}</td>
-  <td><button onclick="del('s',${i})">削除</button></td>
-  </tr>`;
-});
-  expense.forEach((e,i)=>{
-  html+=`<tr>
-  <td>${e.date}</td>
-  <td>${e.payment}</td>
-  <td>${e.account}</td>
-  <td>${e.amount.toLocaleString()}円</td>
-  <td>${e.note||""}</td>
-  <td><button onclick="del('e',${i})">削除</button></td>
-  </tr>`;
-});
+  sales.forEach(s=>{
+    if(!m[s.month])m[s.month]={s:0,e:0};
+    m[s.month].s+=s.amount;
+  });
+
+  expense.forEach(e=>{
+    if(!m[e.month])m[e.month]={s:0,e:0};
+    m[e.month].e+=e.amount;
+  });
+
   let html="";
   Object.keys(m).forEach(k=>{
     html+=`${k}月：${(m[k].s-m[k].e).toLocaleString()}円<br>`;
