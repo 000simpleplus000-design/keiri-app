@@ -63,7 +63,7 @@ td, th { border:1px solid #ccc; padding:5px; font-size:12px; }
 <div id="expenseArea" class="hidden">
 <label>勘定科目</label>
 <select id="expenseAccount">
-<option>通信費</option><option>サブスク</option><option>仕入</option><option>交通費</option><option>雑費</option>
+<option>通信費</option><option>サブスク</option><option>水道光熱費</option><option>消耗品費</option><option>地代家賃</option><option>雑費</option>
 </select>
 
 <label>支払方法</label>
@@ -113,6 +113,348 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 const db = getFirestore();
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-title" content="経理">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+<link rel="apple-touch-icon" href="icon.png">
+
+<title>かんたん帳簿</title>
+
+<style>
+body { font-family: sans-serif; padding: 10px; }
+input, select, button { width:100%; margin:5px 0; padding:10px; }
+.hidden { display:none; }
+table { width:100%; border-collapse: collapse; }
+td, th { border:1px solid #ccc; padding:5px; font-size:12px; }
+</style>
+</head>
+
+<body>
+
+<!-- ログイン -->
+<div id="loginArea">
+<h2>ログイン</h2>
+<input type="text" id="id" placeholder="メール">
+<input type="password" id="pass" placeholder="パスワード">
+<button onclick="login()">ログイン</button>
+<button onclick="signup()">新規登録</button>
+</div>
+
+<!-- メイン -->
+<div id="mainArea" class="hidden">
+
+<select id="mode">
+<option value="売上">売上</option>
+<option value="経費">経費</option>
+</select>
+
+<input type="date" id="date">
+<input type="text" id="month" readonly>
+
+<!-- 売上 -->
+<div id="salesArea">
+<label>売上区分</label>
+<select id="salesCategory">
+<option>BOOTH</option><option>LINE</option><option>Kindle</option><option>その他</option>
+</select>
+
+<label>勘定科目</label>
+<select id="salesAccount">
+<option>売上</option><option>雑収入</option>
+</select>
+
+<label>売上金額</label>
+<input type="number" id="salesAmount">
+<label>備考</label>
+<input type="text" id="salesNote">
+</div>
+
+<!-- 経費 -->
+<div id="expenseArea" class="hidden">
+<label>勘定科目</label>
+<select id="expenseAccount">
+<option>通信費</option><option>サブスク</option><option>水道光熱費</option><option>消耗品費</option><option>地代家賃</option><option>雑費</option>
+</select>
+
+<label>支払方法</label>
+<select id="payment">
+<option>現金</option><option>口座引落</option><option>クレカ</option><option>電子マネー</option><option>その他</option>
+</select>
+
+<label>支払金額</label>
+<input type="number" id="amount">
+<label>按分率（%）</label>
+<input type="number" id="rate">
+<label>経費計上額</label>
+<input type="number" id="finalAmount">
+<label>備考</label>
+<input type="text" id="expenseNote">
+</div>
+
+<button onclick="addData()">追加</button>
+<button onclick="downloadCSV()">CSV</button>
+
+<div id="summary"></div>
+
+<h3>一覧</h3>
+<table id="dataTable"></table>
+
+<h3>月別</h3>
+<div id="monthlySummary"></div>
+
+</div>
+
+<!-- Firebase -->
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
+  authDomain: "keiri-app-simple.firebaseapp.com",
+  projectId: "keiri-app-simple",
+  storageBucket: "keiri-app-simple.firebasestorage.app",
+  messagingSenderId: "1023884345508",
+  appId: "1:1023884345508:web:898993ee41b4be7cd62631"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth();
+const db = getFirestore();
+
+let sales=[];
+let expense=[];
+
+// ===== ログイン =====
+window.login = function(){
+
+  const email=id.value;
+  const passVal=pass.value;
+
+  signInWithEmailAndPassword(auth,email,passVal)
+  .then(()=>{
+    loginArea.classList.add("hidden");
+    mainArea.classList.remove("hidden");
+    loadData();
+  })
+  .catch((e)=>alert(e.message));
+};
+
+// ===== 初期化 =====
+date.onchange=()=>{
+  const d=new Date(date.value);
+  month.value=d.getMonth()+1;
+};
+
+mode.onchange=()=>{
+  salesArea.classList.toggle("hidden",mode.value!=="売上");
+  expenseArea.classList.toggle("hidden",mode.value!=="経費");
+};
+
+rate.oninput=()=>{
+  finalAmount.value=Math.floor(amount.value*rate.value/100);
+};
+
+// ===== 保存 =====
+async function saveData(){
+  const user=auth.currentUser;
+
+ if(!user) return;
+  
+  await setDoc(doc(db,"users",user.uid),{
+    sales: sales || [],
+    expense: expense || []
+  });
+}
+
+// ===== 読込 =====
+async function loadData(){
+  const user=auth.currentUser;
+  const snap=await getDoc(doc(db,"users",user.uid));
+
+  if(snap.exists()){
+    sales=snap.data().sales||[];
+    expense=snap.data().expense||[];
+    calc();
+  }
+}
+
+// ===== 追加 =====
+window.addData=function(){
+
+  if(mode.value==="売上"){
+
+    const amountVal = Number(salesAmount.value);
+
+    sales.push({
+      date:date.value,
+      month:month.value,
+      category:salesCategory.value,
+      account:salesAccount.value,
+      amount:amountVal,
+      note:salesNote.value
+    });
+
+    // ★ BOOTH手数料
+    if(salesCategory.value === "BOOTH"){
+      const fee = Math.ceil(amountVal * 0.056 + 45);
+
+      expense.push({
+        date:date.value,
+        month:month.value,
+        account:"利用料",
+        payment:"BOOTH",
+        amount:fee,
+        note:"BOOTH利用料"
+      });
+    }
+
+  }else{
+
+    expense.push({
+      date:date.value,
+      month:month.value,
+      account:expenseAccount.value,
+      payment:payment.value,
+      rawAmount:Number(amount.value),
+      rate:Number(rate.value),
+      amount:Number(finalAmount.value),
+      note:expenseNote.value
+    });
+  }
+
+  saveData();
+  calc();
+};
+// ===== 表示 =====
+function calc(){
+
+  let s=sales.reduce((a,b)=>a+b.amount,0);
+  let e=expense.reduce((a,b)=>a+b.amount,0);
+
+  let boothFee = 0;
+
+  sales.forEach(s=>{
+    if(s.category === "BOOTH"){
+      boothFee += Math.ceil(s.amount * 0.056 + 45);
+    }
+  });
+  
+summary.innerHTML=`
+売上合計：${(s||0).toLocaleString()}円<br>
+経費合計：${(e||0).toLocaleString()}円<br>
+(BOOTH利用料：${boothFee.toLocaleString()}円)<br>
+利益：${((s-e)||0).toLocaleString()}円
+`;
+  
+  render();
+  monthly();
+}
+
+function render(){
+
+ let html="<tr><th>日付</th><th>区分</th><th>勘定科目</th><th>金額</th><th>備考</th><th></th></tr>";
+
+  sales.forEach((s,i)=>{
+    html+=`<tr>
+<td>${s.date}</td>
+<td>${s.category}</td>
+<td>${s.account}</td>
+<td>${s.amount.toLocaleString()}円</td>
+<td>${s.note||""}</td>
+<td><button onclick="del('s',${i})">削除</button></td>
+</tr>`;
+  });
+
+  expense.forEach((e,i)=>{
+    html+=`<tr>
+<td>${e.date}</td>
+<td>${e.payment}</td>
+<td>${e.account}</td>
+<td>${e.amount.toLocaleString()}円</td>
+<td>${e.note||""}</td>
+<td><button onclick="del('e',${i})">削除</button></td>
+</tr>`;
+  });
+
+  dataTable.innerHTML=html;
+}
+// ===== 削除 =====
+window.del=function(t,i){
+  if(t==="s"){sales.splice(i,1);}else{expense.splice(i,1);}
+  saveData();
+  calc();
+};
+
+// ===== 月別 =====
+function monthly(){
+
+  let m={};
+
+  sales.forEach(s=>{
+    if(!m[s.month])m[s.month]={s:0,e:0};
+    m[s.month].s+=s.amount;
+  });
+
+  expense.forEach(e=>{
+    if(!m[e.month])m[e.month]={s:0,e:0};
+    m[e.month].e+=e.amount;
+  });
+
+  let html="";
+  Object.keys(m).forEach(k=>{
+    html+=`${k}月：${(m[k].s-m[k].e).toLocaleString()}円<br>`;
+  });
+
+  monthlySummary.innerHTML=html;
+}
+
+// ===== 新規登録 =====
+window.signup = function(){
+
+  const email = document.getElementById("id").value;
+  const passVal = document.getElementById("pass").value;
+
+  createUserWithEmailAndPassword(auth, email, passVal)
+  .then(()=>{
+    alert("登録完了！ログインしてください");
+  })
+  .catch((e)=>{
+    alert("登録失敗：" + e.message);
+  });
+};
+
+// ===== CSV =====
+window.downloadCSV=function(){
+
+  let csv="日付,区分,金額\n";
+
+  sales.forEach(s=>{
+    csv+=`${s.date},${s.category},${s.amount}\n`;
+  });
+
+  expense.forEach(e=>{
+    csv+=`${e.date},${e.account},${e.amount}\n`;
+  });
+
+  const blob=new Blob([csv]);
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download="keiri.csv";
+  link.click();
+};
+
+</script>
+
+</body>
+</html>
 
 let sales=[];
 let expense=[];
