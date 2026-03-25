@@ -350,6 +350,12 @@ window.downloadCSV=function(){
     });
   }
 });
+["salesAmount","salesNote","amount","rate","expenseNote"].forEach(id=>{
+  const val = localStorage.getItem(id);
+  if(val){
+    document.getElementById(id).value = val;
+  }
+});
 </script>
 
 </body>
