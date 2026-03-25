@@ -118,12 +118,8 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/f
 
 onAuthStateChanged(auth, (user) => {
   if(user){
-    loginArea.classList.add("hidden");
-    mainArea.classList.remove("hidden");
-    loadData();
-  }else{
-    loginArea.classList.remove("hidden");
-    mainArea.classList.add("hidden");
+    console.log("ログイン済み");
+    // ←画面は切り替えない
   }
 });
 
@@ -132,17 +128,13 @@ let expense=[];
 
 // ===== ログイン =====
 window.login = function(){
-
-  const email=id.value;
-  const passVal=pass.value;
-
-  signInWithEmailAndPassword(auth,email,passVal)
+  signInWithEmailAndPassword(auth,id.value,pass.value)
   .then(()=>{
     loginArea.classList.add("hidden");
     mainArea.classList.remove("hidden");
     loadData();
   })
-  .catch((e)=>alert(e.message));
+  .catch(e=>alert(e.message));
 };
 
 // ===== 初期化 =====
@@ -200,7 +192,7 @@ window.addData=function(){
       note:salesNote.value
     });
 
-    // ★ BOOTH手数料
+    // ★ BOOTH利用料
     if(salesCategory.value === "BOOTH"){
       const fee = Math.ceil(amountVal * 0.056) + 45;
 
