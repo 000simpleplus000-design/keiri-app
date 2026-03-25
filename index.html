@@ -118,10 +118,9 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/f
 
 onAuthStateChanged(auth, (user) => {
   if(user){
-    console.log("ログイン済み");
-    // ←画面は触らない
-  }else{
-    console.log("未ログイン");
+    loginArea.classList.add("hidden");
+    mainArea.classList.remove("hidden");
+    loadData(); // ←これが一覧復活の鍵
   }
 });
 let sales=[];
