@@ -150,7 +150,13 @@ rate.oninput=()=>{
 // ===== 保存 =====
 async function saveData(){
   const user=auth.currentUser;
-  await setDoc(doc(db,"users",user.uid),{sales,expense});
+
+ if(!user) return;
+  
+  await setDoc(doc(db,"users",user.uid),{
+    sales: sales || [],
+    expense: expense || []
+  });
 }
 
 // ===== 読込 =====
@@ -188,10 +194,10 @@ window.addData=function(){
       expense.push({
         date:date.value,
         month:month.value,
-        account:"手数料",
+        account:"利用料",
         payment:"BOOTH",
         amount:fee,
-        note:"BOOTH手数料"
+        note:"BOOTH利用料"
       });
     }
 
