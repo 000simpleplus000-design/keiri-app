@@ -229,6 +229,19 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 const db = getFirestore();
 
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    loginArea.classList.add("hidden");
+    mainArea.classList.remove("hidden");
+    loadData();
+  }else{
+    loginArea.classList.remove("hidden");
+    mainArea.classList.add("hidden");
+  }
+});
+
 let sales=[];
 let expense=[];
 
