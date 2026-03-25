@@ -153,16 +153,20 @@ rate.oninput=()=>{
 };
 
 // ===== 保存 =====
-async function saveData(){
+async function loadData(){
   const user = auth.currentUser;
   if(!user) return;
 
-  console.log("保存するデータ", sales, expense); // ←追加
+  const snap = await getDoc(doc(db,"users",user.uid));
 
-  await setDoc(doc(db,"users",user.uid),{
-    sales,
-    expense
-  });
+  console.log("Firestoreデータ", snap.data()); // ←追加
+
+  if(snap.exists()){
+    sales = snap.data().sales || [];
+    expense = snap.data().expense || [];
+  }
+
+  calc();
 }
 
 // ===== 読込 =====
