@@ -177,18 +177,19 @@ window.addData=function(){
       amount:Number(salesAmount.value),
       note:salesNote.value
     });
-  }else{
-    expense.push({
-      date:date.value,
-      month:month.value,
-      account:expenseAccount.value,
-      payment:payment.value,
-      rawAmount:Number(amount.value),
-      rate:Number(rate.value),
-      amount:Number(finalAmount.value),
-      note:expenseNote.value
-    });
-  }
+    
+    if(salesCategory.value === "BOOTH"){
+  const fee = Math.floor(amountVal * 0.056 + 45);
+
+  expense.push({
+    date:date.value,
+    month:month.value,
+    account:"手数料",
+    payment:"BOOTH",
+    amonth:fee,
+    note:"BOOTH手数料"
+  });
+}
 
   saveData();
   calc();
