@@ -202,7 +202,7 @@ window.addData=function(){
 
     // ★ BOOTH手数料
     if(salesCategory.value === "BOOTH"){
-      const fee = Math.ceil(amountVal * 0.056 + 45);
+      const fee = Math.ceil(amountVal * 0.056) + 45;
 
       expense.push({
         date:date.value,
@@ -241,7 +241,7 @@ function calc(){
 
   sales.forEach(s=>{
     if(s.category === "BOOTH"){
-      boothFee += Math.ceil(s.amount * 0.056 + 45);
+      boothFee += Math.ceil(s.amount * 0.056) + 45;
     }
   });
   
@@ -352,5 +352,4 @@ window.downloadCSV=function(){
 </script>
 
 </body>
-</html>
 </html>
