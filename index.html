@@ -341,7 +341,15 @@ window.downloadCSV=function(){
   link.download="keiri.csv";
   link.click();
 };
-
+// 入力したら自動保存
+["salesAmount","salesNote","amount","rate","expenseNote"].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el){
+    el.addEventListener("input",()=>{
+      localStorage.setItem(id, el.value);
+    });
+  }
+});
 </script>
 
 </body>
