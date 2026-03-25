@@ -112,9 +112,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth();
-const db = getFirestore();
+const db = getDatabase();
 
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
 onAuthStateChanged(auth, (user) => {
   if(user){
@@ -157,30 +157,27 @@ async function loadData(){
   const user = auth.currentUser;
   if(!user) return;
 
-  const snap = await getDoc(doc(db,"users",user.uid));
+  const snapshot = await get(ref(db, "users/" + user.uid));
 
-  console.log("Firestoreデータ", snap.data()); // ←追加
-
-  if(snap.exists()){
-    sales = snap.data().sales || [];
-    expense = snap.data().expense || [];
+  if(snapshot.exists()){
+    const data = snapshot.val();
+    sales = data.sales || [];
+    expense = data.expense || [];
   }
 
   calc();
 }
 
 // ===== 読込 =====
-async function loadData(){
-  const user=auth.currentUser;
-  const snap=await getDoc(doc(db,"users",user.uid));
+async function saveData(){
+  const user = auth.currentUser;
+  if(!user) return;
 
-  if(snap.exists()){
-    sales=snap.data().sales||[];
-    expense=snap.data().expense||[];
-    calc();
-  }
+  await set(ref(db, "users/" + user.uid), {
+    sales,
+    expense
+  });
 }
-
 // ===== 追加 =====
 window.addData=function(){
 
