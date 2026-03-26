@@ -96,6 +96,15 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 
 <!-- Firebase -->
 <script type="module">
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+  
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
 import { getDatabase, ref, set, get } 
@@ -115,9 +124,7 @@ const db = getDatabase();
 onAuthStateChanged(auth, (user) => {
   // 何もしない
 });
-import { signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-signOut(auth);
 // 最初は必ずログイン画面にする
 const loginArea = document.getElementById("loginArea");
 const mainArea = document.getElementById("mainArea");
