@@ -126,8 +126,8 @@ const auth = getAuth();
 const db = getDatabase();
 
 // 最初は必ずログイン画面にする
-loginArea.classList.remove("hidden");
-mainArea.classList.add("hidden");
+const loginArea = document.getElementById("loginArea");
+const mainArea = document.getElementById("mainArea");
 
 onAuthStateChanged(auth, (user) => {
   // 何もしない
