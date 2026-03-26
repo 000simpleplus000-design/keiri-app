@@ -96,6 +96,8 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 
 <!-- Firebase -->
 <script type="module">
+import { setPersistence, browserSessionPersistence } 
+from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
 import { 
@@ -123,6 +125,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth();
+setPersistence(auth, browserSessionPersistence);
 const db = getDatabase();
 
 import { signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
@@ -145,7 +148,11 @@ let expense=[];
 
 // ===== ログイン =====
 window.login = function(){
-  signInWithEmailAndPassword(auth,id.value,pass.value)
+
+  const email = document.getElementById("id").value;
+  const password = document.getElementById("pass").value;
+
+  signInWithEmailAndPassword(auth, email, password)
   .then(()=>{
     loginArea.classList.add("hidden");
     mainArea.classList.remove("hidden");
@@ -329,15 +336,11 @@ function monthly(){
 window.signup = function(){
 
   const email = document.getElementById("id").value;
-  const passVal = document.getElementById("pass").value;
+  const password = document.getElementById("pass").value;
 
-  createUserWithEmailAndPassword(auth, email, passVal)
-  .then(()=>{
-    alert("登録完了！ログインしてください");
-  })
-  .catch((e)=>{
-    alert("登録失敗：" + e.message);
-  });
+  createUserWithEmailAndPassword(auth, email, password)
+  .then(()=>alert("登録OK"))
+  .catch(e=>alert(e.message));
 };
 
 // ===== CSV =====
