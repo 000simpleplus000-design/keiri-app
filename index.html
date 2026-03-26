@@ -129,7 +129,7 @@ onAuthStateChanged(auth, (user) => {
   if(user){
     loginArea.classList.add("hidden");
     mainArea.classList.remove("hidden");
-    loadData(); // ←これが一覧復活の鍵
+    loadData();
   }
 });
 let sales=[];
