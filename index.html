@@ -125,6 +125,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 const db = getDatabase();
 
+import { signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+signOut(auth);
 // 最初は必ずログイン画面にする
 const loginArea = document.getElementById("loginArea");
 const mainArea = document.getElementById("mainArea");
