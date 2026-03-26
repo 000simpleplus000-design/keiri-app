@@ -118,14 +118,6 @@ signOut(auth);
 const loginArea = document.getElementById("loginArea");
 const mainArea = document.getElementById("mainArea");
 
-onAuthStateChanged(auth, (user) => {
-  // 何もしない
-});
-    loginArea.classList.add("hidden");
-    mainArea.classList.remove("hidden");
-    loadData();
-  }
-});
 let sales=[];
 let expense=[];
 
