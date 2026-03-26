@@ -154,10 +154,13 @@ window.login = function(){
 
   signInWithEmailAndPassword(auth, email, password)
   .then(()=>{
-    loginArea.classList.add("hidden");
-    mainArea.classList.remove("hidden");
-    loadData();
-  })
+  const loginArea = document.getElementById("loginArea");
+  const mainArea = document.getElementById("mainArea");
+
+  loginArea.classList.add("hidden");
+  mainArea.classList.remove("hidden");
+  loadData();
+})
   .catch(e=>alert(e.message));
 };
 
