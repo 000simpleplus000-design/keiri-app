@@ -193,7 +193,7 @@ async function saveData(){
   });
 }
 // ===== 追加 =====
-window.addData=function(){
+window.addData = async function(){
 
   if(mode.value==="売上"){
 
@@ -206,6 +206,9 @@ window.addData=function(){
       account:salesAccount.value,
       amount:amountVal,
       note:salesNote.value
+      await saveData();
+alert("保存しました");
+calc();
     });
 
     // ★ BOOTH利用料
@@ -291,14 +294,12 @@ function render(){
   });
 
   dataTable.innerHTML=html;
+  <button onclick="saveAndClose()">保存して閉じる</button>
 }
-// ===== 削除 =====
-window.del=function(t,i){
-  if(t==="s"){sales.splice(i,1);}else{expense.splice(i,1);}
-  saveData();
-  calc();
+window.saveAndClose = async function(){
+  await saveData();
+  alert("保存しました。ブラウザを閉じてOKです");
 };
-
 // ===== 月別 =====
 function monthly(){
 
