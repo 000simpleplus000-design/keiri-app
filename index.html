@@ -130,7 +130,8 @@ loginArea.classList.remove("hidden");
 mainArea.classList.add("hidden");
 
 onAuthStateChanged(auth, (user) => {
-  if(user){
+  // 何もしない
+});
     loginArea.classList.add("hidden");
     mainArea.classList.remove("hidden");
     loadData();
