@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ふ<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -110,7 +110,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 setPersistence(auth, browserSessionPersistence);
 const db = getDatabase();
-
+onAuthStateChanged(auth, (user) => {
+  // 何もしない
+});
 import { signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 signOut(auth);
