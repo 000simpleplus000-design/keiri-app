@@ -83,7 +83,7 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 
 <button onclick="addData()">追加</button>
 <button onclick="downloadCSV()">CSV</button>
-
+<button onclick="saveAndClose()">保存して閉じる</button>
 <div id="summary"></div>
 
 <h3>一覧</h3>
@@ -96,17 +96,16 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 
 <!-- Firebase -->
 <script type="module">
-(async () => {
-  import { 
+
+ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+
+import { 
   getAuth, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged,
+  createUserWithEmailAndPassword,
   setPersistence,
   browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-  
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
 import { getDatabase, ref, set, get } 
 from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
@@ -167,19 +166,14 @@ rate.oninput=()=>{
 };
 
 // ===== 保存 =====
-async function loadData(){
+async function saveData(){
   const user = auth.currentUser;
   if(!user) return;
 
-  const snapshot = await get(ref(db, "users/" + user.uid));
-
-  if(snapshot.exists()){
-    const data = snapshot.val();
-    sales = data.sales || [];
-    expense = data.expense || [];
-  }
-
-  calc();
+  await set(ref(db, "users/" + user.uid), {
+    sales,
+    expense
+  });
 }
 
 // ===== 読込 =====
@@ -206,11 +200,24 @@ window.addData = async function(){
       account:salesAccount.value,
       amount:amountVal,
       note:salesNote.value
-      await saveData();
-alert("保存しました");
-calc();
     });
 
+  }else{
+
+    expense.push({
+      date:date.value,
+      month:month.value,
+      account:expenseAccount.value,
+      payment:payment.value,
+      amount:Number(finalAmount.value),
+      note:expenseNote.value
+    });
+  }
+
+  await saveData(); // ←ここ重要
+  alert("保存しました");
+  calc();
+};
     // ★ BOOTH利用料
     if(salesCategory.value === "BOOTH"){
       const fee = Math.ceil(amountVal * 0.056) + 45;
@@ -294,8 +301,12 @@ function render(){
   });
 
   dataTable.innerHTML=html;
-  <button onclick="saveAndClose()">保存して閉じる</button>
 }
+window.del=function(t,i){
+  if(t==="s"){sales.splice(i,1);}else{expense.splice(i,1);}
+  saveData();
+  calc();
+};
 window.saveAndClose = async function(){
   await saveData();
   alert("保存しました。ブラウザを閉じてOKです");
