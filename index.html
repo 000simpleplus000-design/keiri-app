@@ -96,24 +96,11 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 
 <!-- Firebase -->
 <script type="module">
-import { setPersistence, browserSessionPersistence } 
-from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
-import { 
-  getDatabase, 
-  ref, 
-  set, 
-  get 
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 const firebaseConfig = {
   apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
   authDomain: "keiri-app-simple.firebaseapp.com",
