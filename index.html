@@ -96,16 +96,18 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 
 <!-- Firebase -->
 <script type="module">
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  onAuthStateChanged,
-  setPersistence,
-  browserSessionPersistence,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
 
+import { getDatabase, ref, set, get } 
+from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
+  authDomain: "keiri-app-simple.firebaseapp.com",
+  projectId: "keiri-app-simple",
+  storageBucket: "keiri-app-simple.firebasestorage.app",
+  messagingSenderId: "1023884345508",
+  appId: "1:1023884345508:web:898993ee41b4be7cd62631"
+};
 const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 setPersistence(auth, browserSessionPersistence);
