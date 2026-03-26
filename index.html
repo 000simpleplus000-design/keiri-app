@@ -103,12 +103,12 @@ import {
   getAuth, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  setPersistence,
-  browserSessionPersistence
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 
 import { getDatabase, ref, set, get } 
 from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+  
+// Firebase設定
 const firebaseConfig = {
   apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
   authDomain: "keiri-app-simple.firebaseapp.com",
@@ -117,36 +117,41 @@ const firebaseConfig = {
   messagingSenderId: "1023884345508",
   appId: "1:1023884345508:web:898993ee41b4be7cd62631"
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth();
-setPersistence(auth, browserSessionPersistence);
 const db = getDatabase();
 
 // 最初は必ずログイン画面にする
 const loginArea = document.getElementById("loginArea");
 const mainArea = document.getElementById("mainArea");
 
-let sales=[];
-let expense=[];
+// データ
+let sales = [];
+let expense = [];
 
 // ===== ログイン =====
 window.login = function(){
- 
   const email = document.getElementById("id").value;
   const password = document.getElementById("pass").value;
 
   signInWithEmailAndPassword(auth, email, password)
   .then(()=>{
-  const loginArea = document.getElementById("loginArea");
-  const mainArea = document.getElementById("mainArea");
-
-  loginArea.classList.add("hidden");
-  mainArea.classList.remove("hidden");
-  loadData();
-})
+    document.getElementById("loginArea").classList.add("hidden");
+    document.getElementById("mainArea").classList.remove("hidden");
+    loadData();
+  })
   .catch(e=>alert(e.message));
 };
+// 新規登録
+window.signup = function(){
+  const email = document.getElementById("id").value;
+  const password = document.getElementById("pass").value;
 
+  createUserWithEmailAndPassword(auth, email, password)
+  .then(()=>alert("登録OK"))
+  .catch(e=>alert(e.message));
+};
 // ===== 初期化 =====
 date.onchange=()=>{
   const d=new Date(date.value);
@@ -174,15 +179,21 @@ async function saveData(){
 }
 
 // ===== 読込 =====
-async function saveData(){
+async function loadData(){
   const user = auth.currentUser;
   if(!user) return;
 
-  await setPersistence(auth, browserSessionPersistence);
-    sales,
-    expense
-  });
+  const snapshot = await get(ref(db, "users/" + user.uid));
+
+  if(snapshot.exists()){
+    const data = snapshot.val();
+    sales = data.sales || [];
+    expense = data.expense || [];
+  }
+
+  alert("データ読み込みOK");
 }
+
 // ===== 追加 =====
 window.addData = async function(){
 
@@ -214,6 +225,11 @@ window.addData = async function(){
   await saveData(); // ←ここ重要
   alert("保存しました");
   calc();
+};
+// 閉じる用
+window.saveAndClose = async function(){
+  await saveData();
+  alert("保存しました。閉じてOK");
 };
     // ★ BOOTH利用料
     if(salesCategory.value === "BOOTH"){
