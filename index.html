@@ -222,7 +222,7 @@ window.addData = async function(){
     });
   }
 
-  await saveData(); // ←ここ重要
+  await saveData();
   alert("保存しました");
   calc();
 };
@@ -231,23 +231,7 @@ window.saveAndClose = async function(){
   await saveData();
   alert("保存しました。閉じてOK");
 };
-    // ★ BOOTH利用料
-    if(salesCategory.value === "BOOTH"){
-      const fee = Math.ceil(amountVal * 0.056) + 45;
-
-      expense.push({
-        date:date.value,
-        month:month.value,
-        account:"利用料",
-        payment:"BOOTH",
-        amount:fee,
-        note:"BOOTH利用料"
-      });
-    }
-
-  }else{
-
-    expense.push({
+  
       date:date.value,
       month:month.value,
       account:expenseAccount.value,
