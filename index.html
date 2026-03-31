@@ -5,15 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>かんたん帳簿</title>
 <style>
-    body { font-family: sans-serif; padding: 8px; background: #fdfdfd; }
-    input, select, button { width:100%; margin:3px 0; padding:10px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; }
+    body { font-family: sans-serif; padding: 10px; background: #fdfdfd; }
+    input, select, button { width:100%; margin:4px 0; padding:12px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; }
     .hidden { display:none !important; }
     table { width:100%; border-collapse: collapse; margin-top: 10px; background: white; }
-    td, th { border:1px solid #ccc; padding:8px; font-size:12px; text-align: left; }
+    td, th { border:1px solid #ccc; padding:10px; font-size:13px; text-align: left; }
     th { background: #f0f0f0; }
-    #summary { background: #eef; padding: 12px; border-radius: 5px; margin: 10px 0; font-weight: bold; line-height: 1.6; border-left: 5px solid #007bff; }
-    .del-btn { background: #ff4444; color: white; border: none; padding: 5px 10px; width: auto; cursor: pointer; }
-    h2, h3 { color: #444; margin: 15px 0 5px 0; }
+    #summary { background: #eef; padding: 15px; border-radius: 6px; margin: 10px 0; font-weight: bold; border-left: 5px solid #007bff; }
+    .del-btn { background: #ff4444; color: white; border: none; padding: 6px 12px; width: auto; cursor: pointer; border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -36,18 +35,16 @@
     <input type="hidden" id="month">
 
     <div id="salesArea">
-        <label><small>売上区分</small></label>
         <select id="salesCategory"><option>BOOTH</option><option>LINE</option><option>Kindle</option><option>その他</option></select>
         <input type="number" id="salesAmount" placeholder="売上金額">
         <input type="text" id="salesNote" placeholder="備考">
     </div>
 
     <div id="expenseArea" class="hidden">
-        <label><small>勘定科目</small></label>
         <select id="expenseAccount"><option>通信費</option><option>サブスク</option><option>消耗品費</option><option>地代家賃</option><option>雑費</option></select>
         <input type="number" id="amount" placeholder="支払金額">
         <input type="number" id="rate" placeholder="按分率（%）" value="100">
-        <input type="number" id="finalAmount" placeholder="経費計上額" readonly>
+        <input type="number" id="finalAmount" placeholder="経費計上額" readonly style="background:#eee;">
         <input type="text" id="expenseNote" placeholder="備考">
     </div>
 
@@ -56,10 +53,10 @@
     <div id="summary">データを読み込み中...</div>
 
     <button id="btnCSV" style="background:#6c757d; color:white;">CSV保存</button>
-    <button id="btnSaveClose" style="background:#343a40; color:white;">保存して閉じる</button>
+    <button id="btnSaveClose" style="background:#343a40; color:white;">保存してログイン画面へ</button>
     
-    <h3>一覧</h3>
-    <table id="listTable">
+    <h3>履歴一覧</h3>
+    <table>
         <thead>
             <tr><th>日付</th><th>種類</th><th>金額</th><th>操作</th></tr>
         </thead>
@@ -72,7 +69,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -90,9 +87,8 @@ const db = getDatabase();
 
 let sales = [];
 let expense = [];
-let currentMode = "売上";
 
-// 状態監視
+// ログイン監視
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById("loginArea").classList.add("hidden");
@@ -104,96 +100,76 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// モード切り替え時の確認メッセージ
-document.getElementById("mode").addEventListener('focus', function(e) {
-    currentMode = e.target.value;
-});
-
+// モード切替時の確認メッセージ
 document.getElementById("mode").onchange = (e) => {
-    const salesAmt = document.getElementById("salesAmount").value;
-    const expAmt = document.getElementById("amount").value;
-    
-    if (salesAmt || expAmt) {
-        const confirmSwitch = confirm("入力中のデータがありますが、追加せずに切り替えますか？\n（「キャンセル」を押して「追加」してから切り替えることをお勧めします）");
-        if (!confirmSwitch) {
-            e.target.value = currentMode; // 元のモードに戻す
+    const sAmt = document.getElementById("salesAmount").value;
+    const eAmt = document.getElementById("amount").value;
+    if (sAmt || eAmt) {
+        if (!confirm("入力中のデータがありますが、追加せずに切り替えますか？")) {
+            e.target.value = (e.target.value === "売上") ? "経費" : "売上";
             return;
         }
     }
-    
-    currentMode = e.target.value;
-    const isSales = currentMode === "売上";
+    const isSales = e.target.value === "売上";
     document.getElementById("salesArea").classList.toggle("hidden", !isSales);
     document.getElementById("expenseArea").classList.toggle("hidden", isSales);
 };
 
-// --- 以下、基本機能 ---
-
-document.getElementById("btnLogin").onclick = () => {
-    signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).catch(e => alert("エラー: " + e.message));
+// 按分計算
+const calc = () => {
+    const a = Number(document.getElementById("amount").value) || 0;
+    const r = Number(document.getElementById("rate").value) || 0;
+    document.getElementById("finalAmount").value = Math.floor(a * r / 100);
 };
+document.getElementById("amount").oninput = calc;
+document.getElementById("rate").oninput = calc;
 
-document.getElementById("btnSignup").onclick = () => {
-    createUserWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).then(() => alert("登録完了")).catch(e => alert(e.message));
-};
-
-document.getElementById("date").onchange = (e) => {
-    if(e.target.value) {
-        const d = new Date(e.target.value);
-        document.getElementById("month").value = d.getMonth() + 1;
-    }
-};
-
-const calcExpense = () => {
-    const amt = Number(document.getElementById("amount").value) || 0;
-    const rt = Number(document.getElementById("rate").value) || 0;
-    document.getElementById("finalAmount").value = Math.floor(amt * rt / 100);
-};
-document.getElementById("amount").oninput = calcExpense;
-document.getElementById("rate").oninput = calcExpense;
-
+// 保存
 async function saveData() {
     const user = auth.currentUser;
     if (user) {
-        await set(ref(db, "users/" + user.uid), { sales, expense });
+        await set(ref(db, "users/" + user.uid), { 
+            sales: Array.isArray(sales) ? sales : [], 
+            expense: Array.isArray(expense) ? expense : [] 
+        });
     }
 }
 
+// 読込
 async function loadData() {
-    const user = auth.currentUser;
-    const snapshot = await get(ref(db, "users/" + user.uid));
-    if (snapshot.exists()) {
-        const data = snapshot.val();
-        sales = Array.isArray(data.sales) ? data.sales : [];
-        expense = Array.isArray(data.expense) ? data.expense : [];
+    try {
+        const user = auth.currentUser;
+        const snapshot = await get(ref(db, "users/" + user.uid));
+        if (snapshot.exists()) {
+            const d = snapshot.val();
+            sales = Array.isArray(d.sales) ? d.sales : [];
+            expense = Array.isArray(d.expense) ? d.expense : [];
+        } else {
+            sales = []; expense = [];
+        }
+    } catch (e) {
+        console.error(e);
+        sales = []; expense = [];
     }
     updateUI();
 }
 
+// 追加
 document.getElementById("btnAdd").onclick = async () => {
     const date = document.getElementById("date").value;
-    const month = document.getElementById("month").value;
     if (!date) return alert("日付を入力してください");
+    const d = new Date(date);
+    const month = d.getMonth() + 1;
 
     if (document.getElementById("mode").value === "売上") {
         const amt = Number(document.getElementById("salesAmount").value);
         if(!amt) return alert("金額を入力してください");
-        sales.push({
-            date, month,
-            category: document.getElementById("salesCategory").value,
-            amount: amt,
-            note: document.getElementById("salesNote").value
-        });
+        sales.push({ date, month, category: document.getElementById("salesCategory").value, amount: amt });
         document.getElementById("salesAmount").value = "";
     } else {
         const amt = Number(document.getElementById("finalAmount").value);
         if(!amt) return alert("金額を入力してください");
-        expense.push({
-            date, month,
-            category: document.getElementById("expenseAccount").value,
-            amount: amt,
-            note: document.getElementById("expenseNote").value
-        });
+        expense.push({ date, month, category: document.getElementById("expenseAccount").value, amount: amt });
         document.getElementById("amount").value = "";
         document.getElementById("finalAmount").value = "";
     }
@@ -201,61 +177,68 @@ document.getElementById("btnAdd").onclick = async () => {
     updateUI();
 };
 
-window.delItem = async (type, index) => {
+// 削除
+window.delItem = async (type, i) => {
     if (!confirm("削除しますか？")) return;
-    if (type === 's') sales.splice(index, 1); else expense.splice(index, 1);
+    if (type === 's') sales.splice(i, 1); else expense.splice(i, 1);
     await saveData();
     updateUI();
 };
 
+// 画面更新
 function updateUI() {
-    // 合計の再計算
-    let sTotal = 0;
-    let eTotal = 0;
-    sales.forEach(s => sTotal += (Number(s.amount) || 0));
-    expense.forEach(e => eTotal += (Number(e.amount) || 0));
-    
-    document.getElementById("summary").innerHTML = `
-        売上合計：${sTotal.toLocaleString()}円<br>
-        経費合計：${eTotal.toLocaleString()}円<br>
-        利益：${(sTotal - eTotal).toLocaleString()}円
-    `;
-
-    // 一覧の描画
+    let sTotal = 0, eTotal = 0;
     let html = "";
-    sales.forEach((s, i) => {
-        html += `<tr><td>${s.date}</td><td>売上:${s.category}</td><td>${Number(s.amount).toLocaleString()}</td><td><button class="del-btn" onclick="delItem('s',${i})">削</button></td></tr>`;
+    
+    // 安全にループを回す
+    const sArr = Array.isArray(sales) ? sales : [];
+    const eArr = Array.isArray(expense) ? expense : [];
+
+    sArr.forEach((s, i) => {
+        const v = Number(s.amount) || 0;
+        sTotal += v;
+        html += `<tr><td>${s.date}</td><td>売上:${s.category}</td><td>${v.toLocaleString()}</td><td><button class="del-btn" onclick="delItem('s',${i})">削</button></td></tr>`;
     });
-    expense.forEach((e, i) => {
-        html += `<tr><td>${e.date}</td><td>経費:${e.category}</td><td>${Number(e.amount).toLocaleString()}</td><td><button class="del-btn" onclick="delItem('e',${i})">削</button></td></tr>`;
+    eArr.forEach((e, i) => {
+        const v = Number(e.amount) || 0;
+        eTotal += v;
+        html += `<tr><td>${e.date}</td><td>経費:${e.category}</td><td>${v.toLocaleString()}</td><td><button class="del-btn" onclick="delItem('e',${i})">削</button></td></tr>`;
     });
+
     document.getElementById("dataBody").innerHTML = html;
+    document.getElementById("summary").innerHTML = `売上：${sTotal.toLocaleString()}円 / 経費：${eTotal.toLocaleString()}円<br>利益：${(sTotal - eTotal).toLocaleString()}円`;
 
     // 月別
     let m = {};
-    sales.forEach(s => { if(!m[s.month]) m[s.month]={s:0,e:0}; m[s.month].s += Number(s.amount); });
-    expense.forEach(e => { if(!m[e.month]) m[e.month]={s:0,e:0}; m[e.month].e += Number(e.amount); });
+    sArr.forEach(s => { const k=s.month; m[k]=(m[k]||{s:0,e:0}); m[k].s+=Number(s.amount); });
+    eArr.forEach(e => { const k=e.month; m[k]=(m[k]||{s:0,e:0}); m[k].e+=Number(e.amount); });
     let mHtml = "";
     Object.keys(m).sort((a,b)=>Number(a)-Number(b)).forEach(k => {
-        mHtml += `${k}月：利益 ${(m[k].s - m[k].e).toLocaleString()}円<br>`;
+        mHtml += `<div>${k}月: 利益 ${(m[k].s - m[k].e).toLocaleString()}円</div>`;
     });
     document.getElementById("monthlySummary").innerHTML = mHtml;
 }
 
+// ボタン処理
+document.getElementById("btnLogin").onclick = () => {
+    signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).catch(e => alert("ログイン失敗"));
+};
+document.getElementById("btnSignup").onclick = () => {
+    createUserWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).then(() => alert("登録完了"));
+};
 document.getElementById("btnCSV").onclick = () => {
     let csv = "\uFEFF日付,種類,金額\n";
     sales.forEach(s => csv += `${s.date},売上:${s.category},${s.amount}\n`);
     expense.forEach(e => csv += `${e.date},経費:${e.category},${e.amount}\n`);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `keiri.csv`;
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    link.download = "keiri.csv";
     link.click();
 };
-
 document.getElementById("btnSaveClose").onclick = async () => {
     await saveData();
-    alert("保存が完了しました。ブラウザのタブを閉じて終了してください。");
+    alert("保存しました。安全のためログアウトします。");
+    signOut(auth); // ログイン画面に戻すことで「終了」とする
 };
 </script>
 </body>
