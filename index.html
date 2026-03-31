@@ -210,3 +210,117 @@ function refreshDisplay() {
     let mHtml = "";
     const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
         if (a === "2025-06") return -1;
+        if (b === "2025-06") return 1;
+        return b.localeCompare(a);
+    });
+    sortedKeys.forEach(ym => {
+        const [year, month] = ym.split("-");
+        const profit = monthlyData[ym].s - monthlyData[ym].e;
+        mHtml += `<div class="month-item"><span>${year}年${month}月</span> <span>利益 ${profit.toLocaleString()}円</span></div>`;
+    });
+    document.getElementById("monthlySummary").innerHTML = mHtml;
+}
+
+// クラウド保存処理
+async function saveToFirebase() {
+    const user = auth.currentUser;
+    if (user && isLoaded) {
+        await set(ref(db, "users/" + user.uid), { sales, expense });
+    }
+}
+
+// クラウド読み込み処理
+async function loadFromFirebase() {
+    const user = auth.currentUser;
+    if (!user) return;
+    const snapshot = await get(ref(db, "users/" + user.uid));
+    if (snapshot.exists()) {
+        const data = snapshot.val();
+        sales = Array.isArray(data.sales) ? data.sales : [];
+        expense = Array.isArray(data.expense) ? data.expense : [];
+    } else {
+        sales = []; expense = [];
+    }
+    isLoaded = true; 
+    refreshDisplay();
+}
+
+// 認証状態の監視
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        document.getElementById("loginArea").classList.add("hidden");
+        document.getElementById("mainArea").classList.remove("hidden");
+        loadFromFirebase();
+    } else {
+        document.getElementById("loginArea").classList.remove("hidden");
+        document.getElementById("mainArea").classList.add("hidden");
+        isLoaded = false;
+    }
+});
+
+// 新規データの追加・更新処理
+document.getElementById("btnAdd").onclick = async function() {
+    if(!isLoaded) return alert("読み込み中です");
+    const dateInput = document.getElementById("date").value;
+    if (!dateInput) return alert("日付を選択してください");
+    const mode = document.getElementById("mode").value;
+    
+    if (mode === "売上") {
+        const amt = document.getElementById("salesAmount").value;
+        if (!amt) return alert("金額を入れてください");
+        sales.push({ 
+            date: dateInput, 
+            category: document.getElementById("salesCategory").value, 
+            amount: Number(amt),
+            note: document.getElementById("salesNote").value 
+        });
+        document.getElementById("salesAmount").value = "";
+        document.getElementById("salesNote").value = "";
+    } else {
+        const finalAmt = document.getElementById("finalAmount").value;
+        const origAmt = document.getElementById("amount").value;
+        const rate = document.getElementById("rate").value;
+        if (!finalAmt || finalAmt == "0") return alert("金額を確認してください");
+        expense.push({ 
+            date: dateInput, 
+            category: document.getElementById("expenseAccount").value, 
+            amount: Number(finalAmt),
+            originalAmount: Number(origAmt), // 修正時の復元用
+            rate: Number(rate) 
+        });
+        document.getElementById("amount").value = "";
+        document.getElementById("finalAmount").value = "";
+    }
+    refreshDisplay();
+    await saveToFirebase();
+};
+
+// UI制御：売上と経費の表示切替
+document.getElementById("mode").onchange = function() {
+    const isSales = this.value === "売上";
+    document.getElementById("salesArea").classList.toggle("hidden", !isSales);
+    document.getElementById("expenseArea").classList.toggle("hidden", isSales);
+};
+
+// 経費按分計算
+const calcFinal = () => {
+    const a = Number(document.getElementById("amount").value) || 0;
+    const r = Number(document.getElementById("rate").value) || 0;
+    document.getElementById("finalAmount").value = Math.floor(a * r / 100);
+};
+document.getElementById("amount").oninput = calcFinal;
+document.getElementById("rate").oninput = calcFinal;
+
+// CSV出力処理
+document.getElementById("btnCSV").onclick = () => {
+    let csv = "\uFEFF日付,種類,金額\n";
+    sales.forEach(s => csv += `${s.date},売上:${s.category},${s.amount}\n`);
+    expense.forEach(e => csv += `${e.date},経費:${e.category},${e.amount}\n`);
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    link.download = "keiri.csv";
+    link.click();
+};
+</script>
+</body>
+</html>
