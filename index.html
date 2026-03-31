@@ -97,18 +97,11 @@ td, th { border:1px solid #ccc; padding:3px; font-size:12px; }
 <!-- Firebase -->
 <script type="module">
 
- import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
 
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
-
-import { getDatabase, ref, set, get } 
-from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-  
-// Firebase設定
+// Firebase設定 (あなたの設定をそのまま維持)
 const firebaseConfig = {
   apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
   authDomain: "keiri-app-simple.firebaseapp.com",
@@ -122,109 +115,176 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 const db = getDatabase();
 
-// 最初は必ずログイン画面にする
 const loginArea = document.getElementById("loginArea");
 const mainArea = document.getElementById("mainArea");
 
-// データ
 let sales = [];
 let expense = [];
 
-// ===== ログイン =====
-window.login = function(){
-  const email = document.getElementById("id").value;
-  const password = document.getElementById("pass").value;
-
-  signInWithEmailAndPassword(auth, email, password)
-  .then(()=>{
-    document.getElementById("loginArea").classList.add("hidden");
-    document.getElementById("mainArea").classList.remove("hidden");
+// ログイン状態の監視
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    loginArea.classList.add("hidden");
+    mainArea.classList.remove("hidden");
     loadData();
-  })
-  .catch(e=>alert(e.message));
-};
-// 新規登録
-window.signup = function(){
+  } else {
+    loginArea.classList.remove("hidden");
+    mainArea.classList.add("hidden");
+  }
+});
+
+// ===== ログイン・登録 =====
+window.login = () => {
   const email = document.getElementById("id").value;
   const password = document.getElementById("pass").value;
-
-  createUserWithEmailAndPassword(auth, email, password)
-  .then(()=>alert("登録OK"))
-  .catch(e=>alert(e.message));
-};
-// ===== 初期化 =====
-date.onchange=()=>{
-  const d=new Date(date.value);
-  month.value=d.getMonth()+1;
+  signInWithEmailAndPassword(auth, email, password).catch(e => alert("ログイン失敗: " + e.message));
 };
 
-mode.onchange=()=>{
-  salesArea.classList.toggle("hidden",mode.value!=="売上");
-  expenseArea.classList.toggle("hidden",mode.value!=="経費");
+window.signup = () => {
+  const email = document.getElementById("id").value;
+  const password = document.getElementById("pass").value;
+  createUserWithEmailAndPassword(auth, email, password).then(() => alert("登録完了！")).catch(e => alert(e.message));
 };
 
-rate.oninput=()=>{
-  finalAmount.value=Math.floor(amount.value*rate.value/100);
+// ===== 入力補助 =====
+document.getElementById("date").onchange = (e) => {
+  const d = new Date(e.target.value);
+  document.getElementById("month").value = d.getMonth() + 1;
 };
 
-// ===== 保存 =====
-async function saveData(){
+document.getElementById("mode").onchange = (e) => {
+  document.getElementById("salesArea").classList.toggle("hidden", e.target.value !== "売上");
+  document.getElementById("expenseArea").classList.toggle("hidden", e.target.value !== "経費");
+};
+
+document.getElementById("rate").oninput = document.getElementById("amount").oninput = () => {
+  const amt = Number(document.getElementById("amount").value);
+  const rt = Number(document.getElementById("rate").value);
+  document.getElementById("finalAmount").value = Math.floor(amt * rt / 100);
+};
+
+// ===== データ操作 =====
+async function saveData() {
   const user = auth.currentUser;
-  if(!user) return;
-
-  await set(ref(db, "users/" + user.uid), {
-    sales,
-    expense
-  });
+  if (!user) return;
+  await set(ref(db, "users/" + user.uid), { sales, expense });
 }
 
-// ===== 読込 =====
-async function loadData(){
+async function loadData() {
   const user = auth.currentUser;
-  if(!user) return;
-
   const snapshot = await get(ref(db, "users/" + user.uid));
-
-  if(snapshot.exists()){
+  if (snapshot.exists()) {
     const data = snapshot.val();
     sales = data.sales || [];
     expense = data.expense || [];
   }
-
   calc();
 }
 
-// ===== 追加 =====
-window.addData = async function(){
+window.addData = async function() {
+  const mode = document.getElementById("mode").value;
+  const dateVal = document.getElementById("date").value;
+  const monthVal = document.getElementById("month").value;
 
-  if(mode.value==="売上"){
+  if (!dateVal) return alert("日付を入力してください");
 
-    const amountVal = Number(salesAmount.value);
-
+  if (mode === "売上") {
     sales.push({
-      date:date.value,
-      month:month.value,
-      category:salesCategory.value,
-      account:salesAccount.value,
-      amount:amountVal,
-      note:salesNote.value
+      date: dateVal,
+      month: monthVal,
+      category: document.getElementById("salesCategory").value,
+      account: document.getElementById("salesAccount").value,
+      amount: Number(document.getElementById("salesAmount").value),
+      note: document.getElementById("salesNote").value
     });
-
-  }else{
-
+    document.getElementById("salesAmount").value = "";
+  } else {
     expense.push({
-      date:date.value,
-      month:month.value,
-      account:expenseAccount.value,
-      payment:payment.value,
-      amount:Number(finalAmount.value),
-      note:expenseNote.value
+      date: dateVal,
+      month: monthVal,
+      account: document.getElementById("expenseAccount").value,
+      payment: document.getElementById("payment").value,
+      amount: Number(document.getElementById("finalAmount").value),
+      note: document.getElementById("expenseNote").value
     });
+    document.getElementById("amount").value = "";
+    document.getElementById("finalAmount").value = "";
   }
 
   await saveData();
-  alert("保存しました");
   calc();
+};
+
+window.del = function(type, index) {
+  if (!confirm("削除しますか？")) return;
+  if (type === 's') sales.splice(index, 1);
+  else expense.splice(index, 1);
+  saveData();
+  calc();
+};
+
+// ===== 集計・表示 =====
+function calc() {
+  const sTotal = sales.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+  const eTotal = expense.reduce((a, b) => a + (Number(b.amount) || 0), 0);
+  
+  let boothFee = 0;
+  sales.forEach(s => {
+    if (s.category === "BOOTH") {
+      boothFee += Math.ceil(s.amount * 0.056) + 45;
+    }
+  });
+
+  document.getElementById("summary").innerHTML = `
+    <strong>売上合計：</strong> ${sTotal.toLocaleString()} 円<br>
+    <strong>経費合計：</strong> ${eTotal.toLocaleString()} 円<br>
+    <small>(BOOTH手数料目安: ${boothFee.toLocaleString()} 円)</small><br>
+    <strong>利益：</strong> ${(sTotal - eTotal).toLocaleString()} 円
+  `;
+  render();
+  renderMonthly();
+}
+
+function render() {
+  let html = `<tr><th>日付</th><th>区分/支払</th><th>科目</th><th>金額</th><th>備考</th><th></th></tr>`;
+  sales.forEach((s, i) => {
+    html += `<tr><td>${s.date}</td><td>${s.category}</td><td>${s.account}</td><td>${s.amount.toLocaleString()}</td><td>${s.note || ""}</td><td><button onclick="del('s',${i})">×</button></td></tr>`;
+  });
+  expense.forEach((e, i) => {
+    html += `<tr><td>${e.date}</td><td>${e.payment}</td><td>${e.account}</td><td>${e.amount.toLocaleString()}</td><td>${e.note || ""}</td><td><button onclick="del('e',${i})">×</button></td></tr>`;
+  });
+  document.getElementById("dataTable").innerHTML = html;
+}
+
+function renderMonthly() {
+  let m = {};
+  sales.forEach(s => { if(!m[s.month]) m[s.month]={s:0, e:0}; m[s.month].s += s.amount; });
+  expense.forEach(e => { if(!m[e.month]) m[e.month]={s:0, e:0}; m[e.month].e += e.amount; });
+
+  let html = "<ul>";
+  Object.keys(m).sort((a,b)=>a-b).forEach(k => {
+    html += `<li>${k}月: 利益 ${(m[k].s - m[k].e).toLocaleString()}円</li>`;
+  });
+  document.getElementById("monthlySummary").innerHTML = html + "</ul>";
+}
+
+// ===== CSV出力 (Excel対応BOM付き) =====
+window.downloadCSV = function() {
+  let csv = "日付,種類,勘定科目,金額,備考\n";
+  sales.forEach(s => csv += `${s.date},売上(${s.category}),${s.account},${s.amount},${s.note}\n`);
+  expense.forEach(e => csv += `${e.date},経費(${e.payment}),${e.account},${e.amount},${e.note}\n`);
+
+  const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+  const blob = new Blob([bom, csv], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `keiri_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+};
+
+window.saveAndClose = async () => {
+  await saveData();
+  alert("保存されました");
 };
 // ===== 表示 =====
 function calc(){
