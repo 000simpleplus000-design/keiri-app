@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>かんたん帳簿</title>
 <style>
+    /* 画面全体のデザイン設定 */
     body { font-family: sans-serif; padding: 10px; background: #fdfdfd; max-width: 600px; margin: auto; }
     input, select, button { width:100%; margin:5px 0; padding:12px; box-sizing: border-box; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; }
     .hidden { display:none !important; }
@@ -12,9 +13,9 @@
     td, th { border:1px solid #ccc; padding:10px; font-size:13px; text-align: left; }
     th { background: #f0f0f0; }
     #summary { background: #eef; padding: 15px; border-radius: 6px; margin: 10px 0; font-weight: bold; border-left: 5px solid #007bff; }
-    /* 削除ボタンのスタイル */
     .btn-del { width: auto; padding: 5px 10px; margin: 0; background: #ff4d4d; color: white; border: none; font-size: 11px; cursor: pointer; border-radius: 4px; }
     .month-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; font-size: 14px; }
+    .btn-logout { background: #dc3545 !important; color: white; font-weight: bold; margin-top: 20px; }
 </style>
 </head>
 <body>
@@ -52,6 +53,7 @@
     <div id="summary">売上：0円 / 経費：0円<br>利益：0円</div>
 
     <button id="btnCSV" style="background:#6c757d; color:white;">CSV保存</button>
+    <button onclick="logout()" class="btn-logout">ログアウトして終了</button>
     
     <h3>履歴一覧</h3>
     <table>
@@ -66,10 +68,12 @@
 </div>
 
 <script type="module">
-// 追加のインポート: browserSessionPersistence と setPersistence を追加
+// Firebase関連ライブラリの読み込み
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, setPersistence, browserSessionPersistence, signOut } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+// Firebaseの設定情報
 const firebaseConfig = {
     apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
     authDomain: "keiri-app-simple.firebaseapp.com",
@@ -79,51 +83,66 @@ const firebaseConfig = {
     appId: "1:1023884345508:web:898993ee41b4be7cd62631"
 };
 
+// サービスの初期化
 const app = initializeApp(firebaseConfig);
 const auth = getAuth();
 const db = getDatabase();
 
+// 内部データ管理用の変数
 let sales = [];
 let expense = [];
 let isLoaded = false; 
-// 【新規追加】ログアウトボタン用の関数
+
+// ログアウト処理：セッションを終了して画面をリロード
 window.logout = () => {
-    auth.signOut().then(() => {
-        alert("ログアウトしました");
+    if(!confirm("ログアウトしますか？")) return;
+    signOut(auth).then(() => {
         location.reload(); 
-    });
+    }).catch((e) => alert("ログアウト失敗"));
 };
-// ログイン処理の修正（セッション維持設定を追加）
+
+// ログイン処理：ブラウザを閉じたらログアウトする設定で認証
 document.getElementById("btnLogin").onclick = () => {
     const email = document.getElementById("email").value;
     const pass = document.getElementById("pass").value;
+    if(!email || !pass) return alert("メールとパスワードを入力してください");
 
-    // 「ブラウザを閉じたらログアウトする」設定を適用してからログイン
     setPersistence(auth, browserSessionPersistence)
         .then(() => {
             return signInWithEmailAndPassword(auth, email, pass);
         })
         .catch((e) => alert("ログイン失敗: " + e.message));
-};    
-// 削除機能：ボタンを押したら配列から消して即保存
+};
+
+// 新規登録処理：新しいアカウントを作成
+document.getElementById("btnSignup").onclick = () => {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("pass").value;
+    if(!email || !pass) return alert("メールとパスワードを入力してください");
+
+    setPersistence(auth, browserSessionPersistence)
+        .then(() => {
+            return createUserWithEmailAndPassword(auth, email, pass);
+        })
+        .then(() => alert("登録完了しました"))
+        .catch((e) => alert("登録失敗: " + e.message));
+};
+
+// データの削除処理：一覧から取り除き、クラウドを更新
 window.deleteItem = async (type, index) => {
     if(!isLoaded) return alert("データを読み込み中です...");
     if(!confirm("このデータを削除しますか？")) return;
-    
     if(type === 'sales') sales.splice(index, 1);
     else expense.splice(index, 1);
-    
     refreshDisplay();
     await saveToFirebase();
 };
 
+// 画面表示の更新処理：計算とテーブル作成
 function refreshDisplay() {
-    let sTotal = 0;
-    let eTotal = 0;
-    let tableHtml = "";
-    let monthlyData = {};
+    let sTotal = 0; let eTotal = 0; let tableHtml = ""; let monthlyData = {};
 
-    // 売上の処理
+    // 売上の集計と一覧作成
     sales.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         sTotal += amt;
@@ -134,7 +153,7 @@ function refreshDisplay() {
         monthlyData[ym].s += amt;
     });
 
-    // 経費の処理
+    // 経費の集計と一覧作成
     expense.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         eTotal += amt;
@@ -145,119 +164,6 @@ function refreshDisplay() {
         monthlyData[ym].e += amt;
     });
 
+    // 合計欄の書き換え
     document.getElementById("dataBody").innerHTML = tableHtml;
-    document.getElementById("summary").innerHTML = `売上：${sTotal.toLocaleString()}円 / 経費：${eTotal.toLocaleString()}円<br>利益：${(sTotal - eTotal).toLocaleString()}円`;
-
-    // 月別利益の表示：2025年6月開始に対応した特別な並び替え
-    let mHtml = "";
-    const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
-        if (a === "2025-06") return -1; // 2025年6月を常にトップに
-        if (b === "2025-06") return 1;
-        return b.localeCompare(a); // それ以外は新しい順（降順）
-    });
-
-    sortedKeys.forEach(ym => {
-        const [year, month] = ym.split("-");
-        const profit = monthlyData[ym].s - monthlyData[ym].e;
-        mHtml += `<div class="month-item"><span>${year}年${month}月</span> <span>利益 ${profit.toLocaleString()}円</span></div>`;
-    });
-    document.getElementById("monthlySummary").innerHTML = mHtml;
-}
-
-// クラウド（Firebase）への保存
-async function saveToFirebase() {
-    const user = auth.currentUser;
-    // 読み込みが完了していない状態（isLoaded = false）での上書き事故を防ぐ
-    if (user && isLoaded) {
-        await set(ref(db, "users/" + user.uid), { sales, expense });
-    }
-}
-
-// クラウド（Firebase）からの読み込み
-async function loadFromFirebase() {
-    const user = auth.currentUser;
-    if (!user) return;
-    const snapshot = await get(ref(db, "users/" + user.uid));
-    if (snapshot.exists()) {
-        const data = snapshot.val();
-        sales = Array.isArray(data.sales) ? data.sales : [];
-        expense = Array.isArray(data.expense) ? data.expense : [];
-    } else {
-        sales = [];
-        expense = [];
-    }
-    isLoaded = true; // 読み込み完了をマークして入力を許可する
-    refreshDisplay();
-}
-
-// 認証状態の監視
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        document.getElementById("loginArea").classList.add("hidden");
-        document.getElementById("mainArea").classList.remove("hidden");
-        loadFromFirebase(); // ログインしたら即データを復元
-    } else {
-        document.getElementById("loginArea").classList.remove("hidden");
-        document.getElementById("mainArea").classList.add("hidden");
-        isLoaded = false;
-    }
-});
-
-// データの追加ボタン
-document.getElementById("btnAdd").onclick = async function() {
-    if(!isLoaded) return alert("データを読み込み中です。少々お待ちください。");
-    
-    const dateInput = document.getElementById("date").value;
-    if (!dateInput) return alert("日付を選択してください");
-    
-    const mode = document.getElementById("mode").value;
-    if (mode === "売上") {
-        const amt = document.getElementById("salesAmount").value;
-        if (!amt) return alert("金額を入れてください");
-        sales.push({ date: dateInput, category: document.getElementById("salesCategory").value, amount: Number(amt) });
-        document.getElementById("salesAmount").value = "";
-    } else {
-        const amt = document.getElementById("finalAmount").value;
-        if (!amt || amt == "0") return alert("金額を確認してください");
-        expense.push({ date: dateInput, category: document.getElementById("expenseAccount").value, amount: Number(amt) });
-        document.getElementById("amount").value = "";
-        document.getElementById("finalAmount").value = "";
-    }
-    
-    refreshDisplay();
-    await saveToFirebase(); // 追加した瞬間に保存
-};
-
-// UI制御ロジック
-document.getElementById("mode").onchange = function() {
-    const isSales = this.value === "売上";
-    document.getElementById("salesArea").classList.toggle("hidden", !isSales);
-    document.getElementById("expenseArea").classList.toggle("hidden", isSales);
-};
-
-const calcFinal = () => {
-    const a = Number(document.getElementById("amount").value) || 0;
-    const r = Number(document.getElementById("rate").value) || 0;
-    document.getElementById("finalAmount").value = Math.floor(a * r / 100);
-};
-document.getElementById("amount").oninput = calcFinal;
-document.getElementById("rate").oninput = calcFinal;
-
-document.getElementById("btnLogin").onclick = () => {
-    signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).catch(e => alert("ログイン失敗"));
-};
-document.getElementById("btnSignup").onclick = () => {
-    createUserWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).then(() => alert("登録完了しました"));
-};
-document.getElementById("btnCSV").onclick = () => {
-    let csv = "\uFEFF日付,種類,金額\n";
-    sales.forEach(s => csv += `${s.date},売上:${s.category},${s.amount}\n`);
-    expense.forEach(e => csv += `${e.date},経費:${e.category},${e.amount}\n`);
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    link.download = "keiri.csv";
-    link.click();
-};
-</script>
-</body>
-</html>
+    document.getElementById("summary").innerHTML = `売上：${s
