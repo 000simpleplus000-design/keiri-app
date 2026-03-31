@@ -66,10 +66,10 @@
 </div>
 
 <script type="module">
+// 追加のインポート: browserSessionPersistence と setPersistence を追加
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-
 const firebaseConfig = {
     apiKey: "AIzaSyA-3BwLPxZUTLzXVeaFYkFyujbsRqXl_MQ",
     authDomain: "keiri-app-simple.firebaseapp.com",
@@ -86,7 +86,25 @@ const db = getDatabase();
 let sales = [];
 let expense = [];
 let isLoaded = false; 
+// 【新規追加】ログアウトボタン用の関数
+window.logout = () => {
+    auth.signOut().then(() => {
+        alert("ログアウトしました");
+        location.reload(); 
+    });
+};
+// ログイン処理の修正（セッション維持設定を追加）
+document.getElementById("btnLogin").onclick = () => {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("pass").value;
 
+    // 「ブラウザを閉じたらログアウトする」設定を適用してからログイン
+    setPersistence(auth, browserSessionPersistence)
+        .then(() => {
+            return signInWithEmailAndPassword(auth, email, pass);
+        })
+        .catch((e) => alert("ログイン失敗: " + e.message));
+};    
 // 削除機能：ボタンを押したら配列から消して即保存
 window.deleteItem = async (type, index) => {
     if(!isLoaded) return alert("データを読み込み中です...");
