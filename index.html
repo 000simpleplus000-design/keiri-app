@@ -13,7 +13,7 @@
     th { background: #f0f0f0; }
     #summary { background: #eef; padding: 12px; border-radius: 5px; margin: 10px 0; font-weight: bold; line-height: 1.6; }
     .del-btn { background: #ff4444; color: white; border: none; padding: 5px 10px; width: auto; cursor: pointer; }
-    h2, h3 { color: #444; margin-bottom: 5px; }
+    h2, h3 { color: #444; margin: 15px 0 5px 0; }
 </style>
 </head>
 <body>
@@ -59,14 +59,12 @@
     <button id="btnSaveClose" style="background:#343a40; color:white;">保存して閉じる</button>
     
     <h3>一覧</h3>
-    <div style="overflow-x: auto;">
-        <table>
-            <thead>
-                <tr><th>日付</th><th>項目</th><th>金額</th><th>操作</th></tr>
-            </thead>
-            <tbody id="dataBody"></tbody>
-        </table>
-    </div>
+    <table id="listTable">
+        <thead>
+            <tr><th>日付</th><th>種類</th><th>金額</th><th>操作</th></tr>
+        </thead>
+        <tbody id="dataBody"></tbody>
+    </table>
 
     <h3>月別利益</h3>
     <div id="monthlySummary"></div>
@@ -93,21 +91,17 @@ const db = getDatabase();
 let sales = [];
 let expense = [];
 
-// ログイン状態の管理
 onAuthStateChanged(auth, (user) => {
-    const loginArea = document.getElementById("loginArea");
-    const mainArea = document.getElementById("mainArea");
     if (user) {
-        loginArea.classList.add("hidden");
-        mainArea.classList.remove("hidden");
+        document.getElementById("loginArea").classList.add("hidden");
+        document.getElementById("mainArea").classList.remove("hidden");
         loadData();
     } else {
-        loginArea.classList.remove("hidden");
-        mainArea.classList.add("hidden");
+        document.getElementById("loginArea").classList.remove("hidden");
+        document.getElementById("mainArea").classList.add("hidden");
     }
 });
 
-// ボタン等のイベント紐付け
 document.getElementById("btnLogin").onclick = () => {
     signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).catch(e => alert("エラー: " + e.message));
 };
@@ -137,7 +131,6 @@ const calcExpense = () => {
 document.getElementById("amount").oninput = calcExpense;
 document.getElementById("rate").oninput = calcExpense;
 
-// データ読み書き
 async function saveData() {
     const user = auth.currentUser;
     if (user) {
@@ -153,7 +146,7 @@ async function loadData() {
         sales = data.sales || [];
         expense = data.expense || [];
     }
-    updateUI(); // 読み込み直後に画面更新
+    updateUI();
 }
 
 document.getElementById("btnAdd").onclick = async () => {
@@ -191,17 +184,16 @@ window.delItem = async (type, index) => {
 };
 
 function updateUI() {
-    // 1. 合計金額の計算と表示
     const sTotal = sales.reduce((a, b) => a + (Number(b.amount) || 0), 0);
     const eTotal = expense.reduce((a, b) => a + (Number(b.amount) || 0), 0);
     
     document.getElementById("summary").innerHTML = `
         売上合計：${sTotal.toLocaleString()}円<br>
         経費合計：${eTotal.toLocaleString()}円<br>
-        現在の利益：${(sTotal - eTotal).toLocaleString()}円
+        利益：${(sTotal - eTotal).toLocaleString()}円
     `;
 
-    // 2. 一覧テーブルの更新
+    // 画面上の一覧をCSVと同じ項目(日付,種類,金額)に変更
     let html = "";
     sales.forEach((s, i) => {
         html += `<tr><td>${s.date}</td><td>売上:${s.category}</td><td>${Number(s.amount).toLocaleString()}</td><td><button class="del-btn" onclick="delItem('s',${i})">削</button></td></tr>`;
@@ -211,7 +203,6 @@ function updateUI() {
     });
     document.getElementById("dataBody").innerHTML = html;
 
-    // 3. 月別利益の計算
     let m = {};
     sales.forEach(s => { if(!m[s.month]) m[s.month]={s:0,e:0}; m[s.month].s += Number(s.amount); });
     expense.forEach(e => { if(!m[e.month]) m[e.month]={s:0,e:0}; m[e.month].e += Number(e.amount); });
@@ -222,22 +213,10 @@ function updateUI() {
     document.getElementById("monthlySummary").innerHTML = mHtml;
 }
 
-// 4. CSV保存 (項目：日付,種類,金額)
 document.getElementById("btnCSV").onclick = () => {
     let csv = "\uFEFF日付,種類,金額\n";
     sales.forEach(s => csv += `${s.date},売上:${s.category},${s.amount}\n`);
     expense.forEach(e => csv += `${e.date},経費:${e.category},${e.amount}\n`);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `keiri_${new Date().toLocaleDateString().replace(/\//g,'')}.csv`;
-    link.click();
-};
-
-document.getElementById("btnSaveClose").onclick = async () => {
-    await saveData();
-    alert("保存しました。画面を閉じて終了してください。");
-};
-</script>
-</body>
-</html>
+    link.href = URL.create
