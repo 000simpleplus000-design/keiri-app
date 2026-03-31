@@ -13,7 +13,9 @@
     td, th { border:1px solid #ccc; padding:10px; font-size:13px; text-align: left; }
     th { background: #f0f0f0; }
     #summary { background: #eef; padding: 15px; border-radius: 6px; margin: 10px 0; font-weight: bold; border-left: 5px solid #007bff; }
-    .btn-del { width: auto; padding: 5px 10px; margin: 0; background: #ff4d4d; color: white; border: none; font-size: 11px; cursor: pointer; border-radius: 4px; }
+    /* ボタンのスタイル */
+    .btn-del { width: auto; padding: 5px 10px; margin: 0 2px; background: #ff4d4d; color: white; border: none; font-size: 11px; cursor: pointer; border-radius: 4px; }
+    .btn-edit { width: auto; padding: 5px 10px; margin: 0 2px; background: #ffc107; color: black; border: none; font-size: 11px; cursor: pointer; border-radius: 4px; }
     .month-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; font-size: 14px; }
     .btn-logout { background: #dc3545 !important; color: white; font-weight: bold; margin-top: 20px; }
 </style>
@@ -48,7 +50,7 @@
         <input type="number" id="finalAmount" placeholder="経費計上額" readonly style="background:#f9f9f9;">
     </div>
 
-    <button id="btnAdd" style="background:#28a745; color:white; font-weight:bold; margin-top:10px;">データを追加</button>
+    <button id="btnAdd" style="background:#28a745; color:white; font-weight:bold; margin-top:10px;">データを追加・更新</button>
     
     <div id="summary">売上：0円 / 経費：0円<br>利益：0円</div>
 
@@ -138,6 +140,37 @@ window.deleteItem = async (type, index) => {
     await saveToFirebase();
 };
 
+// データの修正処理：入力欄に値を戻し、元のデータを削除（上書き準備）
+window.editItem = (type, index) => {
+    const item = type === 'sales' ? sales[index] : expense[index];
+    
+    // モード切替
+    const modeSelect = document.getElementById("mode");
+    modeSelect.value = type === 'sales' ? "売上" : "経費";
+    modeSelect.dispatchEvent(new Event('change'));
+
+    // 共通項目
+    document.getElementById("date").value = item.date;
+
+    if(type === 'sales') {
+        document.getElementById("salesCategory").value = item.category;
+        document.getElementById("salesAmount").value = item.amount;
+        document.getElementById("salesNote").value = item.note || "";
+    } else {
+        document.getElementById("expenseAccount").value = item.category;
+        document.getElementById("amount").value = item.originalAmount || item.amount; // 按分前があれば優先
+        document.getElementById("rate").value = item.rate || 100;
+        calcFinal();
+    }
+
+    // 元のデータを一旦削除（追加ボタンを押したときに新データとして保存される）
+    if(type === 'sales') sales.splice(index, 1);
+    else expense.splice(index, 1);
+    
+    refreshDisplay();
+    alert("修正モード：内容を変更して「追加・更新」を押してください。");
+};
+
 // 画面表示の更新処理：計算とテーブル作成
 function refreshDisplay() {
     let sTotal = 0; let eTotal = 0; let tableHtml = ""; let monthlyData = {};
@@ -147,7 +180,10 @@ function refreshDisplay() {
         const amt = Number(item.amount) || 0;
         sTotal += amt;
         tableHtml += `<tr><td>${item.date}</td><td>売上:${item.category}</td><td>${amt.toLocaleString()}円</td>
-                      <td><button class="btn-del" onclick="deleteItem('sales', ${idx})">削除</button></td></tr>`;
+                      <td>
+                        <button class="btn-edit" onclick="editItem('sales', ${idx})">修正</button>
+                        <button class="btn-del" onclick="deleteItem('sales', ${idx})">削除</button>
+                      </td></tr>`;
         const ym = item.date.substring(0, 7);
         if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
         monthlyData[ym].s += amt;
@@ -158,12 +194,19 @@ function refreshDisplay() {
         const amt = Number(item.amount) || 0;
         eTotal += amt;
         tableHtml += `<tr><td>${item.date}</td><td>経費:${item.category}</td><td>${amt.toLocaleString()}円</td>
-                      <td><button class="btn-del" onclick="deleteItem('expense', ${idx})">削除</button></td></tr>`;
+                      <td>
+                        <button class="btn-edit" onclick="editItem('expense', ${idx})">修正</button>
+                        <button class="btn-del" onclick="deleteItem('expense', ${idx})">削除</button>
+                      </td></tr>`;
         const ym = item.date.substring(0, 7);
         if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
         monthlyData[ym].e += amt;
     });
 
-    // 合計欄の書き換え
     document.getElementById("dataBody").innerHTML = tableHtml;
-    document.getElementById("summary").innerHTML = `売上：${s
+    document.getElementById("summary").innerHTML = `売上：${sTotal.toLocaleString()}円 / 経費：${eTotal.toLocaleString()}円<br>利益：${(sTotal - eTotal).toLocaleString()}円`;
+
+    // 月別利益の表示：2025年6月開始に対応した特別な並び替え
+    let mHtml = "";
+    const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
+        if (a === "2025-06") return -1;
