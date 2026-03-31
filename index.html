@@ -12,8 +12,7 @@
     td, th { border:1px solid #ccc; padding:10px; font-size:13px; text-align: left; }
     th { background: #f0f0f0; }
     #summary { background: #eef; padding: 15px; border-radius: 6px; margin: 10px 0; font-weight: bold; border-left: 5px solid #007bff; }
-    /* 削除ボタンのスタイル */
-    .btn-del { width: auto; padding: 5px 10px; margin: 0; background: #ff4d4d; color: white; border: none; font-size: 11px; cursor: pointer; }
+    .btn-del { width: auto; padding: 5px 10px; margin: 0; background: #ff4d4d; color: white; border: none; font-size: 11px; cursor: pointer; border-radius: 4px; }
     .month-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
 </style>
 </head>
@@ -52,7 +51,6 @@
     <div id="summary">売上：0円 / 経費：0円<br>利益：0円</div>
 
     <button id="btnCSV" style="background:#6c757d; color:white;">CSV保存</button>
-    <button id="btnSaveClose" style="background:#343a40; color:white;">保存して終了</button>
     
     <h3>履歴一覧</h3>
     <table>
@@ -86,10 +84,13 @@ const db = getDatabase();
 
 let sales = [];
 let expense = [];
+let isLoaded = false; 
 
-// 削除用の関数をグローバルに登録
+// 削除機能（グローバル登録）
 window.deleteItem = async (type, index) => {
+    if(!isLoaded) return; 
     if(!confirm("このデータを削除しますか？")) return;
+    
     if(type === 'sales') sales.splice(index, 1);
     else expense.splice(index, 1);
     
@@ -103,25 +104,21 @@ function refreshDisplay() {
     let tableHtml = "";
     let monthlyData = {};
 
-    // 売上リスト
     sales.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         sTotal += amt;
         tableHtml += `<tr><td>${item.date}</td><td>売上:${item.category}</td><td>${amt.toLocaleString()}円</td>
                       <td><button class="btn-del" onclick="deleteItem('sales', ${idx})">削除</button></td></tr>`;
-        
-        const ym = item.date.substring(0, 7); // "2025-06" 形式で取得
+        const ym = item.date.substring(0, 7);
         if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
         monthlyData[ym].s += amt;
     });
 
-    // 経費リスト
     expense.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         eTotal += amt;
         tableHtml += `<tr><td>${item.date}</td><td>経費:${item.category}</td><td>${amt.toLocaleString()}円</td>
                       <td><button class="btn-del" onclick="deleteItem('expense', ${idx})">削除</button></td></tr>`;
-        
         const ym = item.date.substring(0, 7);
         if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
         monthlyData[ym].e += amt;
@@ -130,7 +127,7 @@ function refreshDisplay() {
     document.getElementById("dataBody").innerHTML = tableHtml;
     document.getElementById("summary").innerHTML = `売上：${sTotal.toLocaleString()}円 / 経費：${eTotal.toLocaleString()}円<br>利益：${(sTotal - eTotal).toLocaleString()}円`;
 
-    // 月別利益の表示（降順ソート：新しい日付が上）
+    // 2025年6月開始に対応した並び替え（降順）
     let mHtml = "";
     Object.keys(monthlyData).sort((a, b) => b.localeCompare(a)).forEach(ym => {
         const [year, month] = ym.split("-");
@@ -140,42 +137,9 @@ function refreshDisplay() {
     document.getElementById("monthlySummary").innerHTML = mHtml;
 }
 
-document.getElementById("btnAdd").onclick = async function() {
-    const dateInput = document.getElementById("date").value;
-    if (!dateInput) return alert("日付を選択してください");
-
-    const mode = document.getElementById("mode").value;
-    
-    if (mode === "売上") {
-        const amountVal = document.getElementById("salesAmount").value;
-        if (!amountVal) return alert("金額を入力してください");
-        
-        sales.push({
-            date: dateInput,
-            category: document.getElementById("salesCategory").value,
-            amount: Number(amountVal)
-        });
-        document.getElementById("salesAmount").value = "";
-    } else {
-        const amountVal = document.getElementById("finalAmount").value;
-        if (!amountVal || amountVal == "0") return alert("支払金額を入力してください");
-        
-        expense.push({
-            date: dateInput,
-            category: document.getElementById("expenseAccount").value,
-            amount: Number(amountVal)
-        });
-        document.getElementById("amount").value = "";
-        document.getElementById("finalAmount").value = "";
-    }
-
-    refreshDisplay();
-    await saveToFirebase();
-};
-
 async function saveToFirebase() {
     const user = auth.currentUser;
-    if (user) {
+    if (user && isLoaded) {
         await set(ref(db, "users/" + user.uid), { sales, expense });
     }
 }
@@ -187,7 +151,11 @@ async function loadFromFirebase() {
         const data = snapshot.val();
         sales = Array.isArray(data.sales) ? data.sales : [];
         expense = Array.isArray(data.expense) ? data.expense : [];
+    } else {
+        sales = [];
+        expense = [];
     }
+    isLoaded = true; 
     refreshDisplay();
 }
 
@@ -199,8 +167,31 @@ onAuthStateChanged(auth, (user) => {
     } else {
         document.getElementById("loginArea").classList.remove("hidden");
         document.getElementById("mainArea").classList.add("hidden");
+        isLoaded = false;
     }
 });
+
+document.getElementById("btnAdd").onclick = async function() {
+    if(!isLoaded) return alert("データを読み込み中です。少々お待ちください。");
+    const dateInput = document.getElementById("date").value;
+    if (!dateInput) return alert("日付を選択してください");
+    const mode = document.getElementById("mode").value;
+    
+    if (mode === "売上") {
+        const amountVal = document.getElementById("salesAmount").value;
+        if (!amountVal) return alert("金額を入力してください");
+        sales.push({ date: dateInput, category: document.getElementById("salesCategory").value, amount: Number(amountVal) });
+        document.getElementById("salesAmount").value = "";
+    } else {
+        const amountVal = document.getElementById("finalAmount").value;
+        if (!amountVal || amountVal == "0") return alert("支払金額を入力してください");
+        expense.push({ date: dateInput, category: document.getElementById("expenseAccount").value, amount: Number(amountVal) });
+        document.getElementById("amount").value = "";
+        document.getElementById("finalAmount").value = "";
+    }
+    refreshDisplay();
+    await saveToFirebase();
+};
 
 document.getElementById("mode").onchange = function() {
     const isSales = this.value === "売上";
@@ -220,7 +211,7 @@ document.getElementById("btnLogin").onclick = () => {
     signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).catch(e => alert("ログイン失敗"));
 };
 document.getElementById("btnSignup").onclick = () => {
-    createUserWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).then(() => alert("完了"));
+    createUserWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("pass").value).then(() => alert("登録完了しました"));
 };
 document.getElementById("btnCSV").onclick = () => {
     let csv = "\uFEFF日付,種類,金額\n";
@@ -230,10 +221,6 @@ document.getElementById("btnCSV").onclick = () => {
     link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     link.download = "keiri.csv";
     link.click();
-};
-document.getElementById("btnSaveClose").onclick = async () => {
-    await saveToFirebase();
-    document.body.innerHTML = "<div style='padding:50px;text-align:center;'><h2>保存しました</h2><p>ブラウザを閉じて終了してください。</p></div>";
 };
 </script>
 </body>
