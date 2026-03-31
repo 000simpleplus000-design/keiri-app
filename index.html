@@ -12,6 +12,9 @@
     td, th { border:1px solid #ccc; padding:10px; font-size:13px; text-align: left; }
     th { background: #f0f0f0; }
     #summary { background: #eef; padding: 15px; border-radius: 6px; margin: 10px 0; font-weight: bold; border-left: 5px solid #007bff; }
+    /* 削除ボタンのスタイル */
+    .btn-del { width: auto; padding: 5px 10px; margin: 0; background: #ff4d4d; color: white; border: none; font-size: 11px; cursor: pointer; }
+    .month-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
 </style>
 </head>
 <body>
@@ -54,7 +57,7 @@
     <h3>履歴一覧</h3>
     <table>
         <thead>
-            <tr><th>日付</th><th>種類</th><th>金額</th></tr>
+            <tr><th>日付</th><th>種類</th><th>金額</th><th>操作</th></tr>
         </thead>
         <tbody id="dataBody"></tbody>
     </table>
@@ -84,47 +87,59 @@ const db = getDatabase();
 let sales = [];
 let expense = [];
 
-// 【重要】画面を書き換える処理を独立させ、エラーを回避
+// 削除用の関数をグローバルに登録
+window.deleteItem = async (type, index) => {
+    if(!confirm("このデータを削除しますか？")) return;
+    if(type === 'sales') sales.splice(index, 1);
+    else expense.splice(index, 1);
+    
+    refreshDisplay();
+    await saveToFirebase();
+};
+
 function refreshDisplay() {
     let sTotal = 0;
     let eTotal = 0;
     let tableHtml = "";
     let monthlyData = {};
 
-    // 売上リストの処理
-    sales.forEach(item => {
+    // 売上リスト
+    sales.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         sTotal += amt;
-        tableHtml += `<tr><td>${item.date}</td><td>売上:${item.category}</td><td>${amt.toLocaleString()}円</td></tr>`;
+        tableHtml += `<tr><td>${item.date}</td><td>売上:${item.category}</td><td>${amt.toLocaleString()}円</td>
+                      <td><button class="btn-del" onclick="deleteItem('sales', ${idx})">削除</button></td></tr>`;
         
-        const m = item.date.substring(5, 7) || "??";
-        if(!monthlyData[m]) monthlyData[m] = {s:0, e:0};
-        monthlyData[m].s += amt;
+        const ym = item.date.substring(0, 7); // "2025-06" 形式で取得
+        if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
+        monthlyData[ym].s += amt;
     });
 
-    // 経費リストの処理
-    expense.forEach(item => {
+    // 経費リスト
+    expense.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         eTotal += amt;
-        tableHtml += `<tr><td>${item.date}</td><td>経費:${item.category}</td><td>${amt.toLocaleString()}円</td></tr>`;
+        tableHtml += `<tr><td>${item.date}</td><td>経費:${item.category}</td><td>${amt.toLocaleString()}円</td>
+                      <td><button class="btn-del" onclick="deleteItem('expense', ${idx})">削除</button></td></tr>`;
         
-        const m = item.date.substring(5, 7) || "??";
-        if(!monthlyData[m]) monthlyData[m] = {s:0, e:0};
-        monthlyData[m].e += amt;
+        const ym = item.date.substring(0, 7);
+        if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
+        monthlyData[ym].e += amt;
     });
 
-    // 画面への流し込み
     document.getElementById("dataBody").innerHTML = tableHtml;
     document.getElementById("summary").innerHTML = `売上：${sTotal.toLocaleString()}円 / 経費：${eTotal.toLocaleString()}円<br>利益：${(sTotal - eTotal).toLocaleString()}円`;
 
+    // 月別利益の表示（降順ソート：新しい日付が上）
     let mHtml = "";
-    Object.keys(monthlyData).sort().forEach(key => {
-        mHtml += `<div>${key}月：利益 ${(monthlyData[key].s - monthlyData[key].e).toLocaleString()}円</div>`;
+    Object.keys(monthlyData).sort((a, b) => b.localeCompare(a)).forEach(ym => {
+        const [year, month] = ym.split("-");
+        const profit = monthlyData[ym].s - monthlyData[ym].e;
+        mHtml += `<div class="month-item"><span>${year}年${month}月</span> <span>利益 ${profit.toLocaleString()}円</span></div>`;
     });
     document.getElementById("monthlySummary").innerHTML = mHtml;
 }
 
-// データの追加ボタン
 document.getElementById("btnAdd").onclick = async function() {
     const dateInput = document.getElementById("date").value;
     if (!dateInput) return alert("日付を選択してください");
@@ -140,7 +155,7 @@ document.getElementById("btnAdd").onclick = async function() {
             category: document.getElementById("salesCategory").value,
             amount: Number(amountVal)
         });
-        document.getElementById("salesAmount").value = ""; // 入力欄をクリア
+        document.getElementById("salesAmount").value = "";
     } else {
         const amountVal = document.getElementById("finalAmount").value;
         if (!amountVal || amountVal == "0") return alert("支払金額を入力してください");
@@ -154,11 +169,9 @@ document.getElementById("btnAdd").onclick = async function() {
         document.getElementById("finalAmount").value = "";
     }
 
-    refreshDisplay(); // 表と合計を即座に更新！
-    await saveToFirebase(); // Firebaseに保存
+    refreshDisplay();
+    await saveToFirebase();
 };
-
-// --- 以下、補助機能 ---
 
 async function saveToFirebase() {
     const user = auth.currentUser;
