@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>かんたん帳簿 v2</title>
+<title>かんたん帳簿 v2.1</title>
 <style>
     /* 画面全体のデザイン設定 */
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 10px; background: #fdfdfd; max-width: 600px; margin: auto; }
@@ -22,9 +22,9 @@
 <body>
 
 <div id="loginArea">
-    <h2 id="loginStatus">ログイン (v2)</h2>
-    <input type="email" id="email" placeholder="メールアドレス" autocomplete="email">
-    <input type="password" id="pass" placeholder="パスワード" autocomplete="current-password">
+    <h2 id="loginStatus">ログイン</h2>
+    <input type="email" id="email" placeholder="メールアドレス">
+    <input type="password" id="pass" placeholder="パスワード">
     <button id="btnLogin" style="background:#007bff; color:white;">ログイン実行</button>
     <button id="btnSignup" style="background:#6c757d; color:white; margin-top:10px;">新規登録</button>
 </div>
@@ -49,7 +49,7 @@
         <input type="number" id="finalAmount" placeholder="経費計上額" readonly style="background:#f9f9f9;">
     </div>
 
-    <button id="btnAdd" style="background:#28a745; color:white; font-weight:bold; margin-top:10px;">データを追加・更新</button>
+    <button id="btnAdd" style="background:#28a745; color:white; font-weight:bold; margin-top:10px;">データ追加</button>
     
     <div id="summary">売上：0円 / 経費：0円<br>利益：0円</div>
 
@@ -89,6 +89,7 @@ const db = getDatabase();
 let sales = [];
 let expense = [];
 let isLoaded = false; 
+let editTarget = null; // 修正中データの情報を一時保存する変数
 
 // ログアウト処理
 window.logout = () => {
@@ -96,25 +97,17 @@ window.logout = () => {
     signOut(auth).then(() => { location.reload(); });
 };
 
-// 【iPhone対策】最もシンプルなログイン処理
+// ログイン処理
 document.getElementById("btnLogin").onclick = async () => {
     const email = document.getElementById("email").value.trim();
     const pass = document.getElementById("pass").value.trim();
-    
-    if(!email || !pass) {
-        alert("入力が空です");
-        return;
-    }
-
-    // 通信開始を知らせる
+    if(!email || !pass) return alert("入力が空です");
     document.getElementById("loginStatus").innerText = "通信中...";
-
     try {
         await signInWithEmailAndPassword(auth, email, pass);
-        // 成功時はonAuthStateChangedが検知して画面が切り替わります
     } catch (e) {
-        document.getElementById("loginStatus").innerText = "ログイン失敗";
-        alert("エラー詳細: " + e.message);
+        document.getElementById("loginStatus").innerText = "ログイン";
+        alert("ログイン失敗: " + e.message);
     }
 };
 
@@ -134,16 +127,20 @@ document.getElementById("btnSignup").onclick = async () => {
 // データの削除
 window.deleteItem = async (type, index) => {
     if(!isLoaded) return;
-    if(!confirm("削除しますか？")) return;
+    if(!confirm("このデータを削除しますか？")) return;
     if(type === 'sales') sales.splice(index, 1);
     else expense.splice(index, 1);
     refreshDisplay();
     await saveToFirebase();
 };
 
-// データの修正
+// データの修正：一覧からは消さず、入力欄にコピーするだけにする
 window.editItem = (type, index) => {
     const item = type === 'sales' ? sales[index] : expense[index];
+    
+    // 修正モードであることを記録
+    editTarget = { type, index };
+
     const modeSelect = document.getElementById("mode");
     modeSelect.value = type === 'sales' ? "売上" : "経費";
     modeSelect.dispatchEvent(new Event('change'));
@@ -159,15 +156,20 @@ window.editItem = (type, index) => {
         document.getElementById("rate").value = item.rate || 100;
         calcFinal();
     }
-    if(type === 'sales') sales.splice(index, 1);
-    else expense.splice(index, 1);
-    refreshDisplay();
-    alert("修正モード：内容を変更して「追加・更新」を押してください。");
+    
+    // ボタンの色を一時的に変えて修正中であることを示す
+    const addBtn = document.getElementById("btnAdd");
+    addBtn.innerText = "データを上書き保存";
+    addBtn.style.background = "#ffc107";
+    addBtn.style.color = "black";
+
+    window.scrollTo(0, 0); // 入力欄までスクロール
 };
 
-// 画面表示更新
+// 画面表示の更新処理
 function refreshDisplay() {
     let sTotal = 0; let eTotal = 0; let tableHtml = ""; let monthlyData = {};
+
     sales.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         sTotal += amt;
@@ -177,6 +179,7 @@ function refreshDisplay() {
         if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
         monthlyData[ym].s += amt;
     });
+
     expense.forEach((item, idx) => {
         const amt = Number(item.amount) || 0;
         eTotal += amt;
@@ -186,9 +189,11 @@ function refreshDisplay() {
         if(!monthlyData[ym]) monthlyData[ym] = {s:0, e:0};
         monthlyData[ym].e += amt;
     });
+
     document.getElementById("dataBody").innerHTML = tableHtml;
     document.getElementById("summary").innerHTML = `売上：${sTotal.toLocaleString()}円 / 経費：${eTotal.toLocaleString()}円<br>利益：${(sTotal - eTotal).toLocaleString()}円`;
 
+    // 月別利益の表示：2025年6月開始に対応した特別な並び替え
     let mHtml = "";
     const sortedKeys = Object.keys(monthlyData).sort((a, b) => {
         if (a === "2025-06") return -1;
@@ -203,13 +208,13 @@ function refreshDisplay() {
     document.getElementById("monthlySummary").innerHTML = mHtml;
 }
 
-// 保存
+// クラウド保存処理
 async function saveToFirebase() {
     const user = auth.currentUser;
     if (user && isLoaded) await set(ref(db, "users/" + user.uid), { sales, expense });
 }
 
-// 読み込み
+// クラウド読み込み処理
 async function loadFromFirebase() {
     const user = auth.currentUser;
     if (!user) return;
@@ -223,7 +228,7 @@ async function loadFromFirebase() {
     refreshDisplay();
 }
 
-// 監視
+// 認証状態の監視
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById("loginArea").classList.add("hidden");
@@ -236,34 +241,59 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// 追加・更新
+// データ追加（更新）ボタンの処理
 document.getElementById("btnAdd").onclick = async function() {
     if(!isLoaded) return;
     const dateInput = document.getElementById("date").value;
     if (!dateInput) return alert("日付を選択してください");
     const mode = document.getElementById("mode").value;
     
+    let newData;
     if (mode === "売上") {
         const amt = document.getElementById("salesAmount").value;
         if (!amt) return alert("金額を入れてください");
-        sales.push({ date: dateInput, category: document.getElementById("salesCategory").value, amount: Number(amt), note: document.getElementById("salesNote").value });
+        newData = { date: dateInput, category: document.getElementById("salesCategory").value, amount: Number(amt), note: document.getElementById("salesNote").value };
     } else {
         const finalAmt = document.getElementById("finalAmount").value;
         if (!finalAmt || finalAmt == "0") return alert("金額を確認してください");
-        expense.push({ date: dateInput, category: document.getElementById("expenseAccount").value, amount: Number(finalAmt), originalAmount: Number(document.getElementById("amount").value), rate: Number(document.getElementById("rate").value) });
+        newData = { date: dateInput, category: document.getElementById("expenseAccount").value, amount: Number(finalAmt), originalAmount: Number(document.getElementById("amount").value), rate: Number(document.getElementById("rate").value) };
     }
+
+    // 修正モードの場合、元の場所を差し替える
+    if (editTarget) {
+        if (editTarget.type === 'sales') sales[editTarget.index] = newData;
+        else expense[editTarget.index] = newData;
+        editTarget = null; // モード解除
+    } else {
+        // 新規追加の場合
+        if (mode === "売上") sales.push(newData);
+        else expense.push(newData);
+    }
+
+    // ボタン表示を元に戻す
+    const addBtn = document.getElementById("btnAdd");
+    addBtn.innerText = "データ追加";
+    addBtn.style.background = "#28a745";
+    addBtn.style.color = "white";
+
+    // 入力欄をクリア
+    document.getElementById("salesAmount").value = "";
+    document.getElementById("salesNote").value = "";
+    document.getElementById("amount").value = "";
+    document.getElementById("finalAmount").value = "";
+
     refreshDisplay();
     await saveToFirebase();
 };
 
-// UI制御
+// UI制御：売上と経費の表示切替
 document.getElementById("mode").onchange = function() {
     const isSales = this.value === "売上";
     document.getElementById("salesArea").classList.toggle("hidden", !isSales);
     document.getElementById("expenseArea").classList.toggle("hidden", isSales);
 };
 
-// 計算
+// 経費按分計算
 const calcFinal = () => {
     const a = Number(document.getElementById("amount").value) || 0;
     const r = Number(document.getElementById("rate").value) || 0;
@@ -272,7 +302,7 @@ const calcFinal = () => {
 document.getElementById("amount").oninput = calcFinal;
 document.getElementById("rate").oninput = calcFinal;
 
-// CSV
+// CSV出力処理
 document.getElementById("btnCSV").onclick = () => {
     let csv = "\uFEFF日付,種類,金額\n";
     sales.forEach(s => csv += `${s.date},売上:${s.category},${s.amount}\n`);
