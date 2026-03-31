@@ -143,19 +143,31 @@ async function saveToFirebase() {
         await set(ref(db, "users/" + user.uid), { sales, expense });
     }
 }
+// --- 修正版：読み込み・ログイン監視ロジック ---
 
 async function loadFromFirebase() {
     const user = auth.currentUser;
-    const snapshot = await get(ref(db, "users/" + user.uid));
-    if (snapshot.exists()) {
-        const data = snapshot.val();
-        sales = Array.isArray(data.sales) ? data.sales : [];
-        expense = Array.isArray(data.expense) ? data.expense : [];
-    } else {
+    if (!user) return;
+
+    try {
+        const snapshot = await get(ref(db, "users/" + user.uid));
+        if (snapshot.exists()) {
+            const data = snapshot.val();
+            sales = Array.isArray(data.sales) ? data.sales : [];
+            expense = Array.isArray(data.expense) ? data.expense : [];
+        } else {
+            // データが1件もなくても、ここを通れば「読み込み完了」
+            sales = [];
+            expense = [];
+        }
+    } catch (error) {
+        console.error("読み込みエラー:", error);
+        // エラーが起きても、入力を一切受け付けないのは不便なのでフラグを立てる
         sales = [];
         expense = [];
     }
-    isLoaded = true; 
+    
+    isLoaded = true; // ここでロックを解除
     refreshDisplay();
 }
 
@@ -163,14 +175,14 @@ onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById("loginArea").classList.add("hidden");
         document.getElementById("mainArea").classList.remove("hidden");
+        // ログインしたら即座に読み込みを開始
         loadFromFirebase();
     } else {
         document.getElementById("loginArea").classList.remove("hidden");
         document.getElementById("mainArea").classList.add("hidden");
-        isLoaded = false;
+        isLoaded = false; 
     }
 });
-
 document.getElementById("btnAdd").onclick = async function() {
     if(!isLoaded) return alert("データを読み込み中です。少々お待ちください。");
     const dateInput = document.getElementById("date").value;
